@@ -1,3 +1,4 @@
+import sys, os
 from tkinter import *
 from PIL import ImageTk,Image
 import numpy as np
@@ -7,6 +8,7 @@ import time
 import itertools
 import copy
 import openpyxl
+import threading
 
 import utils as ut
 from init import getParameters
@@ -115,7 +117,7 @@ def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
     gridLabels[x][y].grid_forget()
     sys.stdout.flush()
-    
+
     if cellType=='task':
         gridLabels[x][y]=Label(image=taskList[0],borderwidth=6, padx=6,pady=4.495,relief="solid")
         gridLabels[x][y].grid(row=r1,column=r2)
@@ -586,3 +588,449 @@ def stateUpdate():
             taskVertices.remove((a.posX, a.posY))
 
         sys.stdout.flush()
+
+def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable):
+    currentPos={}
+    for a in agents:
+        currentPos[a]=(a.posX,a.posY)
+    currentTasks=taskPos.copy()
+
+    prevCost=0
+    for a in agents:
+        if a in prevMoves:
+            if prevMoves[a]=='n':
+                currentPos[a]=(currentPos[a][0],currentPos[a][1]+1)
+            if prevMoves[a]=='s':
+                currentPos[a]=(currentPos[a][0],currentPos[a][1]-1)
+            if prevMoves[a]=='e':
+                currentPos[a]=(currentPos[a][0]+1,currentPos[a][1])
+            if prevMoves[a]=='w':
+                currentPos[a]=(currentPos[a][0]-1,currentPos[a][1])
+            if prevMoves[a]=='q':
+                currentPos[a]=(currentPos[a][0],currentPos[a][1])
+            if currentPos[a] in currentTasks:
+                currentTasks.remove(currentPos[a])
+
+    if len(currentTasks)==0:
+        return 'q', 0
+
+    assert len(currentTasks)>0
+    minCost=float('inf')
+    bestMove=None
+    Qfactors=[]
+
+    for e in networkEdges:
+        if e[0]==(agent.posX,agent.posY):
+            # #print('flag')
+            tempCurrentTasks=currentTasks.copy()
+            ##print(tempCurrentTasks)
+            tempPositions=currentPos.copy()
+            # #print(tempPositions)
+            if e[1] != e[0]:
+                cost=prevCost+1
+            else:
+                cost=prevCost ## not a bug!!
+            # cost = prevCost + 1
+            tempPositions[agent]=e[1]
+            #print("lookahead edge: ", e)
+            if tempPositions[agent]in tempCurrentTasks:
+                tempCurrentTasks.remove(tempPositions[agent])
+                #bestMove=e[1]
+                #break
+            # #print(tempCurrentTasks)
+            rounds = 0
+            while len(tempCurrentTasks)>0:
+                if rounds > len(networkVertices) + len(networkEdges):
+                    cost += 10_000
+                    break
+                # #print('flag2')
+                # print("POS: ", tempPositions, tempCurrentTasks, cost)
+                for a in agents:
+                    if ((a.ID < agent.ID) and prevMoves[a] != 'q') or (a.ID >= agent.ID):
+                        shortestDist=float('inf')
+                        bestNewPos=None
+                        #assert len(tempCurrentTasks)>0
+                        #print("======== Agent a: {} ========".format((a.posX, a.posY)))
+                        for t in tempCurrentTasks:
+                            # #print("MR: ",tempPositions[agent], tempPositions[a], t)
+                            # dist,path=bfShortestPath(networkVertices,networkEdges,tempPositions[a],t)
+                            try:
+                                #print("PRE:", tempPositions, a.posX, a.posY)
+                                dist,path = (lookupTable[str(tempPositions[a])][str(t)])
+                            except (AssertionError, KeyError):
+                                continue
+                            #dist, path = lookupTable[str(tempPositions[a])][str(t)]
+
+                            # #print("\tPath: {}; Dist: {}".format(path, dist))
+                            if dist<shortestDist:
+                                shortestDist=dist
+                                bestNewPos=path
+                        if bestNewPos != None:
+                            if (e[1] == (agent.posX, agent.posY)) and (a.ID == agent.ID):
+                                ## if this is wait move, main agent must become inactive for
+                                ## rest of cost-to-go computation
+                                pass
+                            else:
+                                tempPositions[a]=bestNewPos
+                        if tempPositions[a] in tempCurrentTasks:
+                            tempCurrentTasks.remove(tempPositions[a])
+                        if e[1] != (agent.posX, agent.posY) or (a.posX!=agent.posX) or (a.ID != agent.ID):
+                            cost += 1
+                        rounds += 1
+                        if len(tempCurrentTasks)==0:
+                            break
+            #print("resulting cost for action {}: {} ".format((e[0],e[1]), cost))
+            #print(e[1], cost)
+            if cost<minCost:
+                minCost=cost
+                bestMove=e[1]
+                if bestMove == e[0]:
+                    print("Waiting! ")
+                    # elif cost==minCost:
+            #    r=random.random()
+            #   if r<0.5:
+            #      bestMove=e[1]
+            Qfactors.append((e[1],cost))
+            del tempPositions
+            del tempCurrentTasks
+
+    assert bestMove!=None
+    minQ = float('inf')
+    for factor in Qfactors:
+        if factor[1] < minQ:
+            minQ = factor[1]
+
+    print(agent.posX, agent.posY, Qfactors)
+    ## collect all ties...
+    wait_ind = None
+    ties = []
+
+    for factor in Qfactors:
+        if factor[1] == minQ:
+            if factor[0]==(agent.posX+1,agent.posY):
+                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('e') != agent.prev_move):
+                    ties.append((factor,'e'))
+            elif factor[0]==(agent.posX-1,agent.posY):
+                if ((agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('w') != agent.prev_move)):
+                    ties.append((factor,'w'))
+            elif factor[0]==(agent.posX,agent.posY+1):
+                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('s') != agent.prev_move):
+                    ties.append((factor,'s'))
+            elif factor[0]==(agent.posX,agent.posY-1):
+                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('n') != agent.prev_move):
+                    ties.append((factor,'n'))
+            elif factor[0]==(agent.posX,agent.posY):
+                ties.append((factor,'q'))
+
+    if len(ties) == 0:
+        for factor in Qfactors:
+            if factor[1] == minQ:
+                if factor[0]==(agent.posX+1,agent.posY):
+                    ties.append((factor,'e'))
+                elif factor[0]==(agent.posX-1,agent.posY):
+                    ties.append((factor,'w'))
+                elif factor[0]==(agent.posX,agent.posY+1):
+                    ties.append((factor,'n'))
+                elif factor[0]==(agent.posX,agent.posY-1):
+                    ties.append((factor,'s'))
+                elif factor[0]==(agent.posX,agent.posY):
+                    ties.append(factor,'q')
+
+    bestMove = ties[0][0][0]
+
+    if bestMove==(agent.posX+1,agent.posY):
+        ret= 'e'
+    elif bestMove==(agent.posX-1,agent.posY):
+        ret= 'w'
+    elif bestMove==(agent.posX,agent.posY+1):
+        ret= 'n'
+    elif bestMove==(agent.posX,agent.posY-1):
+        ret= 's'
+    elif bestMove==(agent.posX,agent.posY):
+        ret= 'q'
+    return ret,minCost
+
+def multiAgentRollout(networkVertices,networkEdges,networkAgents,taskPos,agent,prevMoves):
+    currentPos={}
+    for a in networkAgents: ## a is actually a.ID...
+        currentPos[a]=(agents[a-1].posX-networkAgents[a][0],agents[a-1].posY-networkAgents[a][1])
+    currentTasks=taskPos.copy()
+
+    prevCost=0
+    for a_ID in networkAgents:
+        # #print("moved", a_ID)
+        a = agents[a_ID-1]
+        if a in prevMoves:
+            if prevMoves[a]=='n':
+                currentPos[a_ID]=(currentPos[a_ID][0],currentPos[a_ID][1]+1)
+            if prevMoves[a]=='s':
+                currentPos[a_ID]=(currentPos[a_ID][0],currentPos[a_ID][1]-1)
+            if prevMoves[a]=='e':
+                currentPos[a_ID]=(currentPos[a_ID][0]+1,currentPos[a_ID][1])
+            if prevMoves[a]=='w':
+                currentPos[a_ID]=(currentPos[a_ID][0]-1,currentPos[a_ID][1])
+            if prevMoves[a]=='q': ## wait move
+                currentPos[a_ID]=(currentPos[a_ID][0], currentPos[a_ID][1])
+            if currentPos[a_ID] in currentTasks:
+                currentTasks.remove(currentPos[a_ID])
+
+    agent_ID = list(agent.keys())[0]
+    agent_posX = agents[agent_ID-1].posX - agent[agent_ID][0]
+    agent_posY = agents[agent_ID-1].posY - agent[agent_ID][1]
+    x_offset = agent[agent_ID][0]
+    y_offset = agent[agent_ID][1]
+    agent_prev_move = agents[agent_ID-1].prev_move
+    if len(currentTasks)==0:
+        return 'q', 0
+    assert len(currentTasks)>0
+    minCost=float('inf')
+    bestMove=None
+    Qfactors=[]
+    #print(networkEdges)
+    for e in networkEdges:
+        assert e[1] in networkVertices
+        if e[0]==(agent_posX,agent_posY):
+            tempCurrentTasks=currentTasks.copy()
+            tempPositions=currentPos.copy()
+            if e[1] != e[0]:
+                cost=prevCost+1
+            else:
+                cost=prevCost
+            tempPositions[agent_ID]=e[1]
+            if tempPositions[agent_ID] in tempCurrentTasks:
+                # cost -= 100
+                tempCurrentTasks.remove(tempPositions[agent_ID])
+
+            rounds = 0
+            while len(tempCurrentTasks)>0:
+                if rounds >= len(networkVertices) + len(networkEdges):
+                    cost += len(networkVertices) + len(networkEdges)
+                    break
+                for a in networkAgents:
+                    if (a in prevMoves.keys() and prevMoves[a] != 'q') or (a not in prevMoves.keys()):
+                        shortestDist=float('inf')
+                        bestNewPos=None
+
+                        for t in tempCurrentTasks:
+                            a_pos = (tempPositions[a][0]+x_offset,tempPositions[a][1]+y_offset)
+                            t_pos = (t[0]+x_offset,t[1]+y_offset)
+                            dist, path = offlineTrainRes[str(a_pos)][str(t_pos)]
+                            if dist<shortestDist:
+                                shortestDist=dist
+                                bestNewPos=path
+                        if bestNewPos != None:
+                            if (e[1] != (agent_posX,agent_posY)) or (agent_ID != a):
+                                #print(a_pos, t_pos, bestNewPos, vertices)
+                                tempPositions[a]=(bestNewPos[0]-x_offset,bestNewPos[1]-y_offset)
+                                cost += 1
+                        if tempPositions[a] in tempCurrentTasks:
+                            # cost -= 100
+                            tempCurrentTasks.remove(tempPositions[a])
+                            #print("\tRemoving...", tempPositions[a], tempCurrentTasks)
+                        rounds += 1
+                        if len(tempCurrentTasks)==0:
+                            break
+            if cost<minCost:
+                minCost=cost
+                bestMove=e[1]
+
+            Qfactors.append((e[1],cost))
+            del tempPositions
+            del tempCurrentTasks
+
+    assert bestMove!=None
+    minQ = float('inf')
+    for factor in Qfactors:
+        if factor[1] < minQ:
+            minQ = factor[1]
+
+    ## collect all ties...
+    ties = []
+    for factor in Qfactors:
+         if factor[1] == minQ:
+             if factor[0]==(agent_posX+1,agent_posY):
+                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('e') != agent_prev_move):
+                     ties.append((factor,'e'))
+             elif factor[0]==(agent_posX-1,agent_posY):
+                 if ((agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('w') != agent_prev_move)):
+                     ties.append((factor,'w'))
+             elif factor[0]==(agent_posX,agent_posY+1):
+                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('s') != agent_prev_move):
+                     ties.append((factor,'s'))
+             elif factor[0]==(agent_posX,agent_posY-1):
+                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('n') != agent_prev_move):
+                     ties.append((factor,'n'))
+             elif factor[0]==(agent_posX,agent_posY):
+                 ties.append((factor,'q'))
+
+    if len(ties) == 0:
+         for factor in Qfactors:
+             if factor[1] == minQ:
+                 if factor[0]==(agent_posX+1,agent_posY):
+                     ties.append((factor,'e'))
+                 elif factor[0]==(agent_posX-1,agent_posY):
+                     ties.append((factor,'w'))
+                 elif factor[0]==(agent_posX,agent_posY+1):
+                     ties.append((factor,'n'))
+                 elif factor[0]==(agent_posX,agent_posY-1):
+                     ties.append((factor,'s'))
+                 elif factor[0]==(agent_posX,agent_posY):
+                     ties.append(factor,'q')
+
+    bestMove = ties[0][0][0]
+
+    if bestMove==(agent_posX+1,agent_posY):
+        ret= 'e'
+    elif bestMove==(agent_posX-1,agent_posY):
+        ret= 'w'
+    elif bestMove==(agent_posX,agent_posY+1):
+        ret= 'n'
+    elif bestMove==(agent_posX,agent_posY-1):
+        ret= 's'
+    elif bestMove==(agent_posX,agent_posY):
+        ret= 'q' ## wait move
+    return ret,minCost
+
+def mergeTimelines():
+    # #print("Merging... ")
+    # Naive Merge
+    for agent in agents:
+        agent.posX = agent.posX_prime
+        agent.posY = agent.posY_prime
+        agent.color = agent.color_prime
+        agent.cost = agent.cost_prime
+
+        agent.dir=agent.dir_prime
+        agent.clusterID=(agent.clusterID_prime.copy())
+        agent.parent=(agent.parent_prime)
+        agent.children=agent.children_prime
+        agent.stateMem=(agent.stateMem_prime)
+        agent.viewEdges=(agent.viewEdges_prime)
+        agent.viewVertices=(agent.viewVertices_prime)
+        agent.viewAgents=(agent.viewAgents_prime)
+        agent.viewTasks=(agent.viewTasks_prime)
+        agent.eta=agent.eta_prime
+        agent.message=agent.message_prime
+        agent.clusterVertices=(agent.clusterVertices_prime.copy())
+        agent.clusterEdges=(agent.clusterEdges_prime)
+        agent.clusterTasks=(agent.clusterTasks_prime)
+        agent.clusterAgents=(agent.clusterAgents_prime)
+        agent.localVertices=(agent.localVertices_prime)
+        agent.localEdges=(agent.localEdges_prime)
+        agent.localTasks=(agent.localTasks_prime)
+        agent.localAgents=(agent.localAgents_prime)
+        agent.childMarkers=(agent.childMarkers_prime)
+        agent.xOffset=agent.xOffset_prime
+        agent.yOffset=agent.yOffset_prime
+        agent.resetCounter=agent.resetCounter_prime
+        agent.moveList=(agent.moveList_prime)
+        agent.marker=agent.marker_prime
+        agent.dfsNext=agent.dfsNext_prime
+
+        if agent.gui_split == True:
+            #print(agent.ID, agent.color)
+            if visualizer:
+                changeCell(agent.posX, agent.posY, "agent", agent.color)
+            agent.gui_split = False
+
+    ## Merge Mutual Connections
+    for agent in agents:
+        ## if x is not the parent of agent, then remove x from agent.children
+        for x in agents:
+            if x != agent and x != agent.parent:
+                if agent in x.children:
+                    x.children.remove(agent)
+
+def getClosestClusterTask(agent, taskVertices, lookupTable):
+    min_dist = float('inf')
+    best_move = None
+    for task in taskVertices:
+        try:
+            dist, path = lookupTable[str((agent.posX, agent.posY))][str(task)]
+        except (AssertionError, KeyError):
+            continue
+        if dist < min_dist:
+            min_dist = dist
+            best_move = path
+    if best_move == (agent.posX+1, agent.posY):
+        next_dir = 'e'
+    elif best_move == (agent.posX-1, agent.posY):
+        next_dir = 'w'
+    elif best_move == (agent.posX, agent.posY-1):
+        next_dir = 's'
+    elif best_move == (agent.posX, agent.posY+1):
+        next_dir = 'n'
+    elif best_move == None:
+        next_dir = 'q'
+    else:
+        raise ValueError
+
+    return next_dir, min_dist
+
+def main():
+    totalCost = 0
+    waitCost = 0
+    df = pd.DataFrame({'Centralized':[], 'Seed #': [],
+                        'Rows': [], 'Cols': [], 'Wall Prob': [],
+                        '# of Agents': [], '# of Tasks': [],
+                        'k': [], 'psi': [], 'Total Time (s)': [],
+                        '# of Exploration': []})
+    lookupTable = offlineTrainRes
+
+    if centralized:
+        begin = time.time()
+        while len(taskVertices) > 0:
+            moves = {}
+            for a in agents:
+                if only_base_policy:
+                    move, c = getClosestClusterTask(a, taskVertices,
+                                                    lookupTable)
+                else:
+                    move, c = multiAgentRolloutCent(vertices, adjList, agents,
+                                                    taskVertices, a, moves,
+                                                    lookupTable)
+                moves[a] = move
+                a.move(move)
+
+                if move != 'q':
+                    totalCost += 1
+                else:
+                    waitCost += 1
+            stateUpdate()
+
+            time.sleep(wait_time)
+            sys.stdout.flush()
+            if visualizer:
+                costLabel = Label(root, text='Total Cost: ' + str(totalCost))
+                costLabel.grid(row=rows+1, column=cols-3,columnspan=4)
+        end = time.time()
+        totalTime = end-begin
+        print("Done. ")
+        new_data['# of Exploration Steps'] = str(0)
+        new_data['Wait Cost'] = str(waitCost)
+        if visualizer:
+            quitButton.invoke()
+
+#Driver
+def start():
+    #print('starting')
+    t=threading.Thread(target=main)
+    t.start()
+
+# if __name__ == "__main__":
+#   main()
+#Add Interface
+if visualizer:
+    goButton=Button(root,text='Start',pady=10,padx=50,command=start)
+    goButton.grid(row=rows+1, column=0, columnspan=cols-4)
+    quitButton=Button(root, text="Quit", command=root.destroy)
+    quitButton.grid(row=rows+2, column=0, columnspan=cols-4)
+    costLabel=Label(root,text='Total Cost: '+str(totalCost))
+    costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
+
+    goButton.invoke()
+
+    root.mainloop()
+else:
+    main()
+
