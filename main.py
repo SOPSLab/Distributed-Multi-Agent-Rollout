@@ -566,3 +566,23 @@ def getLegalMovesFrom(x,y):
         moves.append('s')
     return moves
 
+def stateUpdate():
+    sys.stdout.flush()
+
+    for a in agents:
+        if visualizer:
+            changeCell(a.posX, a.posY, 'blank', 0)
+
+        if a.getDir() == 'e':
+            a.setXPos(a.posX+1)
+        elif a.getDir() == 'w':
+            a.setXPos(a.posX-1)
+        elif a.getDir() == 's':
+            a.setYPos(a.posY-1)
+        elif a.getDir() == 'n':
+            a.setYPos(a.posY+1)
+
+        if (a.posX, a.posY) in taskVertices:
+            taskVertices.remove((a.posX, a.posY))
+
+        sys.stdout.flush()

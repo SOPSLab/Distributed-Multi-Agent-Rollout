@@ -1,2 +1,2 @@
 # Distributed-Multi-Agent-Rollout
-Improved implementation of the DRL repo. 
+Implementation of the improved DRL algorithm with provable sequential improvement wrt Greedy. 
