@@ -1011,6 +1011,55 @@ def main():
         if visualizer:
             quitButton.invoke()
 
+    else:
+        try:
+            begin =  time.time()
+            explore_steps = 0
+
+            rounds = 0
+            COMPLETION_PARAM = 0.1
+            target_completion = int(COMPLETION_PARAM * len(taskVertices))
+            while len(taskVertices) > target_completion:
+                time.sleep(wait_time)
+
+                rounds += 1
+
+                for a in agents:
+                    a.updateView()
+
+                updateAgentToAgentView()
+                sys.stdout.flush()
+
+                ## SOAC Phase 1
+                for a in agents:
+                    a.eta += len(viewTasks)
+                    a.eta_prime += len(a.viewTasks_prime)
+
+                #### SOAC Phase 2
+                """
+                For each agent a in agents that can see a task, search a's view for another agent that is already part of a cluster.
+                    If no such agent in a's view, make a the centroid.
+
+                """
+                for a in agents:
+                    # #print(a.viewTasks)
+                    if a.eta > 0: ## a can see a task...
+                        flag = True ## assume a is going to be the centroid of a new cluster...
+
+                        for x in a.viewAgents:
+                            if len(x.clusterID) > 0 and x != a: ## a sees agent x that already belongs to a cluster...
+                                flag = False ## a cannot be the centroid of a new cluster...
+
+                        if flag: ## a is the new centroid...
+                            a.clusterID_prime.append(a.ID)
+                            a.parent_prime = None ## a has no parent since it is the centroid...
+
+                mergeTimelines()
+
+        except KeyboardInterrupt:
+            sys.exit(0)
+
+
 #Driver
 def start():
     #print('starting')
