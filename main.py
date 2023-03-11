@@ -1041,13 +1041,18 @@ def main():
                 updateAgentToAgentView()
                 sys.stdout.flush()
 
-                ## SOAC Phase 1
+                """
+                ---------------------------- SOAC ----------------------------
+                """
+                ## Phase 1
                 for a in agents:
                     a.eta += len(a.viewTasks)
                     a.eta_prime += len(a.viewTasks_prime)
 
-                #### SOAC Phase 2
                 """
+                Begin Phase 2: 
+                ----------------------------
+
                 For each agent a in agents that can see a task, search a's view for another agent that is already part of a cluster.
                     If no such agent in a's view, make a the centroid.
 
@@ -1114,10 +1119,6 @@ def main():
                                         x.children_prime.append(a)
 
                     mergeTimelines()
-                    if verbose:
-                        print("Phase 3: ")
-                        for a in agents:
-                            print(a.ID, a.clusterID)
 
                     """
                     Begin Phase 4:
@@ -1151,10 +1152,6 @@ def main():
                                     x.children_prime = []
 
                     mergeTimelines()
-                    if verbose:
-                        print("Phase 4: ")
-                        for a in agents:
-                            print(a.ID, a.clusterID)
 
                     """
                     Begin Phase 4.5:
@@ -1206,6 +1203,20 @@ def main():
 
                         mergeTimelines()
 
+                if '1' in verbose or verbose == '-1':
+                    print("Phase 5: ")
+                    for a in agents:
+                        print(a.ID, a.color, a.clusterID, end=" ")
+                        if a.parent != None:
+                            print(a.parent.ID)
+                        else:
+                            print()
+                        print("Children: ", end=" ")
+                        for b in a.children:
+                            print(b.ID, end=" ")
+                        print()
+                    print()
+
                 """
                 Begin Phase 6:
                 ----------------------------
@@ -1226,11 +1237,25 @@ def main():
                 for a in agents:
                     if a.parent != None and len(a.clusterID) > 0:
                         for b in a.viewAgents:
-                            if b != a and b != a.children: 
+                            if b != a and b != a.parent: 
                                 if a in b.children: 
                                     b.children.remove(a)
 
                 time.sleep(wait_time)
+
+                if '1' in verbose or verbose == '-1':
+                    print("Phase 7: ")
+                    for a in agents:
+                        print(a.ID, a.color, a.clusterID, end=" ")
+                        if a.parent != None:
+                            print(a.parent.ID)
+                        else:
+                            print()
+                        print("Children: ", end=" ")
+                        for b in a.children:
+                            print(b.ID, end=" ")
+                        print()
+                    print()
 
                 """
                 Begin Phase 8: 
@@ -1251,7 +1276,368 @@ def main():
                                 a.gui_split = True
                     mergeTimelines()
 
-                break
+                if '1' in verbose or verbose == '-1':
+                    print("End of SOAC... ")
+                    for a in agents:
+                        print(a.ID, a.color, a.clusterID, end=" ")
+                        if a.parent != None:
+                            print(a.parent.ID)
+                        else:
+                            print()
+                        print("Children: ", end=" ")
+                        for b in a.children:
+                            print(b.ID, end=" ")
+                        print()
+                    print()
+
+                """
+                ---------------------------- LMA ----------------------------
+                """
+                if '2' in verbose or verbose == '-1':
+                    print("Beginning LMA... ")
+
+                for a in agents:
+                    a.message = False # turn off message flag
+
+                """
+                Begin Phase 0.5: 
+                ----------------------------
+
+                Offset passing within a cluster before map sharing.
+
+                """
+                for a in agents:
+                    if len(a.clusterID) != 0 and a.parent == None:
+                        a.xOffset = a.posX
+                        a.yOffset = a.posY
+                        a.message = True
+                for _ in range(N):
+                    for a in agents:
+                        if a.message == True:
+                            for b in a.children:
+                                if b.message == False: 
+                                    b.xOffset = a.xOffset
+                                    b.yOffset = a.yOffset
+                                    b.message = True
+                for a in agents:
+                    a.message = False
+
+                """
+                Begin Phase 1: 
+                ----------------------------
+
+                Obtain mapOffset values and adjust local view for 
+                leader agents. Begin map sharing with children of
+                all leader agents. 
+
+                """
+                for a in agents:
+                    if a.parent==None and len(a.clusterID)>0:
+                        for b in a.children:
+                            a.childMarkers.append(0)
+
+                        a.updateLocalView()
+                        a.clusterAgents=a.localAgents.copy()
+                        ## get rid of agents that are not part of any cluster...
+                        to_del = []
+                        for a_ID in a.clusterAgents:
+                            if agents[a_ID-1].clusterID == []:
+                                to_del.append(a_ID)
+                        for a_ID in to_del:
+                            del a.clusterAgents[a_ID]
+
+                        s=a.clusterAgents.copy()
+                        # get rid of agents that are not in the same cluster...
+                        for a_ID in s:
+                            if agents[a_ID-1].clusterID[0]!=a.clusterID[0]:
+                                del a.clusterAgents[a_ID]
+
+                        a.clusterVertices=a.localVertices.copy()
+                        a.clusterEdges=a.localEdges.copy()
+                        a.clusterTasks=a.localTasks.copy()
+
+                        for b in a.children:
+                            b.clusterVertices=b.clusterVertices.union(a.clusterVertices)
+                            b.clusterEdges=b.clusterEdges.union(a.clusterEdges)
+                            b.clusterTasks=b.clusterTasks.union(a.clusterTasks)
+                            b.clusterAgents={**b.clusterAgents, 
+                                                **a.clusterAgents}
+                        a.message=True
+
+                """
+                Begin Phase 2: 
+                ----------------------------
+
+                Map sharing with all agents in the cluster. 
+
+                """
+                for i in range(N):
+                    for a in agents:
+                        if a.parent != None and a.parent.message:
+                            for b in a.children:
+                                a.childMarkers.append(0)
+
+                            l=a.mapOffset(a.parent.xOffset,a.parent.yOffset,
+                                          a.viewVertices,
+                                          a.viewEdges,
+                                          a.viewTasks,
+                                          a.viewAgents)
+
+                            for x in l[3]:
+                                flag=False
+                                for y in a.clusterAgents:
+                                    if x == y:
+                                        flag=True
+                                if not flag:
+                                    a.clusterAgents[x] = l[3][x]
+                            s=a.clusterAgents.copy()
+
+                            for b in s:
+                                if len(agents[b-1].clusterID)==0:
+                                    del a.clusterAgents[b]
+                                elif agents[b-1].clusterID[0]!=a.clusterID[0]:
+                                    del a.clusterAgents[b]
+
+                            a.clusterVertices=a.clusterVertices.union(l[0])
+                            a.clusterEdges=a.clusterEdges.union(l[1])
+                            a.clusterTasks=a.clusterTasks.union(l[2])
+
+                            for b in a.children:
+                                a.childMarkers.append(0)
+                                b.clusterVertices=b.clusterVertices.union(a.clusterVertices)
+                                b.clusterEdges=b.clusterEdges.union(a.clusterEdges)
+                                b.clusterTasks=b.clusterTasks.union(a.clusterTasks)
+                                b.clusterAgents={**b.clusterAgents, 
+                                                    **(a.clusterAgents)}
+
+                            a.message=True
+                            a.parent.resetCounter+=1
+                            if a.parent.resetCounter==len(a.parent.children):
+                                a.parent.message=False
+
+                """
+                Begin Phase 3: 
+                ----------------------------
+
+                Propogate map information back to leader. 
+
+                """
+                for i in range(N):
+                    for a in agents:
+                        if len(a.clusterID)>0 and a.parent!= None:
+                            a.parent.clusterVertices=a.parent.clusterVertices.union(a.clusterVertices)
+                            a.parent.clusterEdges=a.parent.clusterEdges.union(a.clusterEdges)
+                            a.parent.clusterTasks=a.parent.clusterTasks.union(a.clusterTasks)
+                            a.parent.clusterAgents={**a.parent.clusterAgents, 
+                                                    **(a.clusterAgents)}
+
+                ## Known error check
+                for agent in agents:
+                    agent_pos = {}
+                    for a in agent.clusterAgents:
+                        agent_pos[a]=(agents[a-1].posX-agent.clusterAgents[a][0],agents[a-1].posY-agent.clusterAgents[a][1])
+                        cluster = agents[a-1].clusterID[0]
+                    try:
+                        assert len(set(agent_pos.values()).intersection(set(agent.clusterTasks))) == 0
+                    except AssertionError:
+                        task_list = list(agent.clusterTasks)
+                        task_list = [(agents[cluster-1].posX+task[0], 
+                                    agents[cluster-1].posY+task[1]) for task in task_list]
+                        if '2' in verbose or verbose == '-1':
+                            print(agent_pos, agent.clusterTasks, 
+                                    set(agent_pos.values()).intersection(set(agent.clusterTasks)), set(task_list).intersection(set(taskVertices)))
+                        raise AssertionError
+
+                """
+                ---------------------------- T-MAR ----------------------------
+                """
+                if '3' in verbose or verbose == '-1':
+                    print("Beginning T-MAR... ")
+                for a in agents:
+                    if '3' in verbose or verbose == '-1':
+                        print(len(a.clusterVertices),len(vertices))
+                    if a.parent==None and len(a.clusterID)>0:
+                        for b in a.clusterAgents:
+                            if b==a.ID:
+                                agent={b: a.clusterAgents[b]}
+                        if '3' in verbose or verbose == '-1':
+                            print("Multi: ", a.ID, a.posX, a.posY, 
+                                    a.clusterTasks, a.clusterAgents)
+                        cluster_centroid = agents[a.clusterID[0]-1]
+                        if only_base_policy:
+                            true_tasks = set([(task[0]+cluster_centroid.posX, task[1]+cluster_centroid.posY) for task in list(a.clusterTasks)])
+                            move,c = getClosestClusterTask(a, true_tasks, lookupTable)
+                        else:
+                            move,c=multiAgentRollout(list(a.clusterVertices),
+                                                     list(a.clusterEdges),
+                                                     (a.clusterAgents),
+                                                     list(a.clusterTasks),
+                                                     agent,a.moveList)
+                        a.move(move)
+                        if '3' in verbose or verbose == '-1':
+                            print("First: ", a.ID, a.posX, a.posY, move)
+                        a.moveList[a]=move
+                        if move != 'q': ## not a wait move
+                            totalCost+=1
+                        else:
+                            waitCost += 1
+                        a.marker=True
+                        flag=False
+                        for b in a.children:
+                            if b.marker==False:
+                                flag=True
+                                b.dfsNext=True
+                                b.moveList=a.moveList.copy()
+                                b.clusterVertices=a.clusterVertices.copy()
+                                b.clusterEdges=a.clusterEdges.copy()
+                                b.clusterTasks=a.clusterTasks.copy()
+                                b.clusterAgents=copy.deepcopy(a.clusterAgents)
+
+                                """
+                                b_agents = set(b.clusterAgents.values())
+                                b_tasks = set(b.clusterTasks)
+                                print("Working???", b_agents, b_tasks, b_agents.intersection(b_tasks))
+                                if len(b_agents.intersection(b_tasks)) != 0:
+                                    print("ALERT, ALERT!!! ", b_agents.intersection(b_tasks))
+                                    raise AssertionError
+                                # for i in range(len(b.clusterAgents)):
+                                #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
+                                break
+                                """
+
+                for i in range(N):
+                    for a in agents:
+                        if a.dfsNext:
+                            a.dfsNext=False
+                            if not a.marker:
+                                for b in a.clusterAgents:
+                                    if b==a.ID:
+                                        agent={b: a.clusterAgents[b]}
+                                ##print('ID '+str(a.ID))
+                                ##print(a.clusterVertices)
+                                ##print(a.clusterEdges)
+                                # #print("MR: ", a.posX, a.posY, a.clusterTasks)
+                                # for edge in a.clusterEdges:
+                                #   if edge[0] == (agents[b-1].posX,agents[b-1].posY):
+                                #       #print(edge)
+                                cluster_centroid = agents[a.clusterID[0]-1]
+                                if only_base_policy:
+                                    true_tasks = set([(task[0]+cluster_centroid.posX, task[1]+cluster_centroid.posY) for task in list(a.clusterTasks)])
+                                    move,c = getClosestClusterTask(a, true_tasks, lookupTable)
+                                else:
+                                    move,c=multiAgentRollout(list(a.clusterVertices),
+                                                             list(a.clusterEdges),
+                                                             (a.clusterAgents),
+                                                             list(a.clusterTasks),
+                                                             agent,a.moveList)
+                                a.move(move)
+                                if '3' in verbose or verbose == '-1':
+                                    print("Second: ", a.ID, a.posX, a.posY, move)
+                                a.moveList[a]=move
+                                if move != 'q': ## not a wait move
+                                    totalCost+=1
+                                else:
+                                    waitCost += 1
+                                a.marker=True
+                                flag=False
+                                for b in a.children:
+                                    if b.marker==False:
+                                        flag=True
+                                        b.dfsNext=True
+                                        b.moveList=a.moveList.copy()
+                                        b.clusterVertices=a.clusterVertices.copy()
+                                        b.clusterEdges=a.clusterEdges.copy()
+                                        b.clusterTasks=a.clusterTasks.copy()
+                                        b.clusterAgents=copy.deepcopy(a.clusterAgents)
+                                        # for i in range(len(b.clusterAgents)):
+                                        #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
+                                        break
+                                #Send up to parent
+                                if not flag and a.parent!=None:
+                                    a.parent.dfsNext=True
+                                    a.parent.moveList=a.moveList.copy()
+                                    a.parent.clusterVertices=a.clusterVertices.copy()
+                                    a.parent.clusterEdges=a.clusterEdges.copy()
+                                    a.parent.clusterTasks=a.clusterTasks.copy()
+                                    a.parent.clusterAgents=copy.deepcopy(a.clusterAgents)
+                                    # for i in range(len(a.parent.clusterAgents)):
+                                    #   a.parent.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
+                            else:
+                                flag=False
+                                for b in a.children:
+                                    if b.marker==False:
+                                        flag=True
+                                        b.dfsNext=True
+                                        b.moveList=a.moveList.copy()
+                                        b.clusterVertices=a.clusterVertices.copy()
+                                        b.clusterEdges=a.clusterEdges.copy()
+                                        b.clusterTasks=a.clusterTasks.copy()
+                                        b.clusterAgents=copy.deepcopy(a.clusterAgents)
+                                        # for i in range(len(b.clusterAgents)):
+                                        #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
+                                        break
+                                #Send up to parent
+                                if not flag and a.parent!=None:
+                                    a.parent.dfsNext=True
+                                    a.parent.moveList=a.moveList.copy()
+                                    a.parent.clusterVertices=a.clusterVertices.copy()
+                                    a.parent.clusterEdges=a.clusterEdges.copy()
+                                    a.parent.clusterTasks=a.clusterTasks.copy()
+                                    a.parent.clusterAgents=copy.deepcopy(a.clusterAgents)
+                                    # for i in range(len(a.parent.clusterAgents)):
+                                    #   a.parent.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
+
+                for a in agents:
+                    if a.exp_dist_remaining != 0:
+                        a.clusterID = []
+
+                for a in agents:
+                    if len(a.clusterID)==0:
+                        #print("Exploring... ", a.posX, a.posY)
+                        a.dir=getExplorationMove(a, lookupTable)
+                        if a.dir != 'q':
+                            totalCost+=1
+                            explore_steps += 1
+                        else:
+                            if verbose == '-1':
+                                print(f"Move: {a.ID}, {a.dir}, {a.exp_dir}")
+                            waitCost += 1
+                    else:
+                        if verbose == '-1':
+                            print(f"Move: {a.ID}, {a.dir}, {a.exp_dir}")
+
+                # for a in agents:
+                #   #print("Post: ", a.posX, a.posY, a.dir)
+
+                stateUpdate()
+
+                for a in agents:
+                    a.deallocate()
+
+                    a.reset()
+                    a.resetColor()
+
+                    a.posX_prime = a.posX
+                    a.posY_prime = a.posY
+
+                time.sleep(wait_time)
+
+                sys.stdout.flush()
+                if visualizer:
+                    costLabel=Label(root,text='Total Cost: '+str(totalCost))
+                    costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
+
+            end = time.time()
+            #print("Decentralized Cost: ", totalCost)
+
+            totalTime = end-begin
+            #print("Decentralized Time: ", end - begin)
+
+            new_data['# of Exploration Steps'] = explore_steps
+            new_data['Wait Cost'] = waitCost
+            if visualizer:
+                quitButton.invoke()
+
         except KeyboardInterrupt:
             sys.exit(0)
 

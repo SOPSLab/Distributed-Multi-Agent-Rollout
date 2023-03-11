@@ -207,8 +207,8 @@ def getParameters():
     parser.add_argument('--exp', required=True, type=int)
     parser.add_argument('--only_base_pi', required=False, default=False, 
                             action='store_true')
-    parser.add_argument('--verbose', required=False, default=False,
-                            action='store_true')
+    parser.add_argument('--verbose', required=False, default=0,
+                            type=str)
     # parser.add_argument('--seed', required=False, default=1234)
     args = parser.parse_args()
 
@@ -225,7 +225,7 @@ def getParameters():
     collisions = (args.no_colis)
     exp_strat = args.exp
     only_base_policy = args.only_base_pi
-    verbose = args.verbose
+    verbose = (str)(args.verbose)
     # seed = (int)(args.seed)
 
     assert(numTasks < rows*cols)
