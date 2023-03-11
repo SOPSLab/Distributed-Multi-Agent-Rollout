@@ -80,6 +80,24 @@ def offlineTrainCent(networkVertices, networkEdges):
 
     return lookupDict
 
+def bfs(vertices,edges,root,goal):
+    Q=[]
+    labels={}
+    for v in vertices:
+        labels[str(v)]=False
+    Q.append(root)
+    labels[str(root)]=True
+    while (len(Q))>0:
+        v=Q.pop(0)
+        if v==goal:
+            return True
+        for e in edges:
+            if e[0]==v:
+                if labels[str(e[1])]==False:
+                    labels[str(e[1])]=True
+                    Q.append(e[1])
+    return False
+
 def getBFSTree(vertices, edges, source):
     tree_vertices = []
     tree_edges = []

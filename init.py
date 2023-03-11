@@ -7,38 +7,6 @@ import random
 from tqdm import tqdm
 
 import time
-# seed = np.random.randint(1000000)
-# #print("Seed: ", seed)
-# seed = 912985
-# seed = 248839
-# seed = 758250
-# seed = 901620
-# seed = 240768
-# seed = 854885 # BestPos IndexError -- SOLVED
-# seed = 147224 # BestPos IndexError
-# seed = 433466 # --- Agents see task and yet do not solve it.
-# seed = 127108 # --- Agents do not move
-# seed = 519668 # --- Possibly too large 10 x 10 x 25 x 10 -- works now... Without the time.sleep(1), but a little slow.
-# np.random.seed(seed)
-# parser = argparse.ArgumentParser()
-# parser.add_argument('row', type=int)
-# parser.add_argument('col', type=int)
-# parser.add_argument('agt', type=int)
-# parser.add_argument('task', type=int)
-# args = parser.parse_args()
-
-# rows = args.row
-# cols = args.col
-# numAgents = args.agt
-# numTasks = args.task
-
-### Not needed...
-# try:
-# 	assert (numAgents >= numTasks)
-# except AssertionError:
-# 	#print("Number of agents must be greater than number of tasks")
-# 	sys.exit()
-###
 
 def init_valid_grid(rows, cols, numAgents, numTasks, wall_prob=0.2, seed=1234, colis=True):
     print("Allowing Colissions? ", colis)
@@ -226,15 +194,21 @@ def getParameters():
     parser.add_argument('--col', required=True)
     parser.add_argument('--agt', required=True)
     parser.add_argument('--task', required=True)
-    parser.add_argument('--cent', required=False, default=False, action='store_true')
+    parser.add_argument('--cent', required=False, default=False, 
+                            action='store_true')
     parser.add_argument('--k', required=True)
     parser.add_argument('--psi', required=True)
-    parser.add_argument('--vis', required=False, default=False, action='store_true')
+    parser.add_argument('--vis', required=False, default=False, 
+                            action='store_true')
     parser.add_argument('--seed', required=True)
     parser.add_argument('--wall_pr', required=True)
-    parser.add_argument('--no_colis', required=False, default=True, action='store_false')
+    parser.add_argument('--no_colis', required=False, default=True, 
+                            action='store_false')
     parser.add_argument('--exp', required=True, type=int)
-    parser.add_argument('--only_base_pi', required=False, default=False, action='store_true')
+    parser.add_argument('--only_base_pi', required=False, default=False, 
+                            action='store_true')
+    parser.add_argument('--verbose', required=False, default=False,
+                            action='store_true')
     # parser.add_argument('--seed', required=False, default=1234)
     args = parser.parse_args()
 
@@ -251,6 +225,7 @@ def getParameters():
     collisions = (args.no_colis)
     exp_strat = args.exp
     only_base_policy = args.only_base_pi
+    verbose = args.verbose
     # seed = (int)(args.seed)
 
     assert(numTasks < rows*cols)
@@ -261,7 +236,9 @@ def getParameters():
     # else:
     #print("Decentralized")
 
-    return rows, cols, numAgents, numTasks, k, psi, centralized, visualizer, wall_prob, seed, collisions, exp_strat, only_base_policy
+    return rows, cols, numAgents, numTasks, k, psi, centralized, \
+            visualizer, wall_prob, seed, collisions, exp_strat, \
+            only_base_policy, verbose
 
 
 

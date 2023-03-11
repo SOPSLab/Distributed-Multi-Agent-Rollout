@@ -18,7 +18,8 @@ wait_time = 0
 totalCost = 0
 padding = 20
 
-rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, seed, collisions, exp_strat, only_base_policy = getParameters()
+rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
+seed, collisions, exp_strat, only_base_policy, verbose = getParameters()
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
@@ -41,7 +42,8 @@ vertices=[]
 global colors
 colors=[]
 for i in range(100):
-    colors=colors+[1,2,3,4,5,6,7,8,9,10,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+    colors+=[1,2,3,4,5,6,7,8,9,10,12,13,14,15,16,17,18,
+                19,20,21,22,23,24,25,26,27,28,29,30,31]
 
 if visualizer:
     #agent images
@@ -51,7 +53,8 @@ if visualizer:
         img=ImageTk.PhotoImage(img)
         agentImages.append(img)
 
-    blankLabel=Label(root, text="     ", borderwidth=6, padx=padding,pady=padding,relief="solid")
+    blankLabel=Label(root, text="     ", borderwidth=6, 
+                    padx=padding,pady=padding,relief="solid")
 
     # #Add Tasks
     taskList=[]
@@ -77,14 +80,17 @@ taskVertices = out['task_verts']
 ## truncate task list to accomodate lesser number of tasks
 assert len(taskVertices) >= numTasks
 if len(taskVertices) != numTasks:
-    delete_inds = random.sample(range(len(taskVertices)), len(taskVertices)-numTasks)
-    tasks = [taskVertices[i] for i in range(len(taskVertices)) if i not in delete_inds]
+    delete_inds = random.sample(range(len(taskVertices)), 
+                                len(taskVertices)-numTasks)
+    tasks = [taskVertices[i] for i in range(len(taskVertices)) \
+                if i not in delete_inds]
     taskVertices = tasks
 assert len(taskVertices) == numTasks
 
 print(gridGraph)
 for i in range(len(taskVertices)):
-    colors = colors + [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+    colors+=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,
+                19,20,21,22,23,24,25,26,27,28,29,30,31]
 
 N = len(vertices)
 N = 2**(psi+1)
@@ -93,11 +99,13 @@ if visualizer:
     for i in range(rows):
         for j in range(cols):
             if gridGraph[i][j]==0:
-                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, bg='#333366', padx=padding,pady=padding,relief="solid")
+                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, 
+                    bg='#333366', padx=padding,pady=padding,relief="solid")
                 gridLabels[i][j].grid(row=i,column=j)
 
             else:
-                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, padx=padding,pady=padding,relief="solid")
+                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, 
+                    padx=padding,pady=padding,relief="solid")
                 gridLabels[i][j].grid(row=i,column=j)
                 # vertices.append((i,j))
 
@@ -110,8 +118,10 @@ if visualizer:
     for i in range(numTasks):
         gridGraph[taskVertices[i][0]][taskVertices[i][1]]='T'
         gridLabels[taskVertices[i][0]][taskVertices[i][1]].grid_forget()
-        gridLabels[taskVertices[i][0]][taskVertices[i][1]]=Label(image=taskList[i],borderwidth=6, padx=6,pady=4.495,relief="solid")
-        gridLabels[taskVertices[i][0]][taskVertices[i][1]].grid(row=taskVertices[i][0],column=taskVertices[i][1])
+        gridLabels[taskVertices[i][0]][taskVertices[i][1]]=Label(
+            image=taskList[i],borderwidth=6, padx=6,pady=4.495,relief="solid")
+        gridLabels[taskVertices[i][0]][taskVertices[i][1]].grid(
+            row=taskVertices[i][0],column=taskVertices[i][1])
 
 def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
@@ -119,13 +129,16 @@ def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
 
     if cellType=='task':
-        gridLabels[x][y]=Label(image=taskList[0],borderwidth=6, padx=6,pady=4.495,relief="solid")
+        gridLabels[x][y]=Label(image=taskList[0],borderwidth=6, 
+            padx=6,pady=4.495,relief="solid")
         gridLabels[x][y].grid(row=r1,column=r2)
     elif cellType=='agent':
-        gridLabels[x][y]=Label(image=agentImages[agentNum-1],borderwidth=6, padx=6,pady=4.495,relief="solid")
+        gridLabels[x][y]=Label(image=agentImages[agentNum-1],borderwidth=6, 
+            padx=6,pady=4.495,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
     elif cellType=='blank':
-        gridLabels[x][y]=Label(root, text="     ", borderwidth=6,  padx=padding,pady=padding,relief="solid")
+        gridLabels[x][y]=Label(root, text="     ", borderwidth=6, 
+            padx=padding,pady=padding,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
 
 class Agent:
@@ -407,7 +420,7 @@ class Agent:
             T_prime=self.viewTasks_prime.copy()
             ##print(E)
             for u in s:
-                if u!=(self.posX,self.posY) and not bfs(s,E,(self.posX,self.posY),u):
+                if u!=(self.posX,self.posY) and not ut.bfs(s,E,(self.posX,self.posY),u):
                     for e in E:
                         if (e[0]==u or e[1]==u) and e in self.viewEdges:
                             self.viewEdges.remove(e)
@@ -417,7 +430,7 @@ class Agent:
             del s
 
             for u in s_prime:
-                if u!=(self.posX,self.posY) and not bfs(s_prime,E_prime,(self.posX,self.posY),u):
+                if u!=(self.posX,self.posY) and not ut.bfs(s_prime,E_prime,(self.posX,self.posY),u):
                     for e in E_prime:
                         if (e[0]==u or e[1]==u) and e in self.viewEdges_prime:
                             self.viewEdges_prime.remove(e)
@@ -553,8 +566,6 @@ def getExplorationMove(agent, lookupTable):
             agent.exploring = False
 
         return direction
-
-
 
 def getLegalMovesFrom(x,y):
     moves=['q']
@@ -1032,7 +1043,7 @@ def main():
 
                 ## SOAC Phase 1
                 for a in agents:
-                    a.eta += len(viewTasks)
+                    a.eta += len(a.viewTasks)
                     a.eta_prime += len(a.viewTasks_prime)
 
                 #### SOAC Phase 2
@@ -1056,9 +1067,193 @@ def main():
 
                 mergeTimelines()
 
+                ### Begin Phase RR (Round Robin):
+                """
+                Observe that at this stage the only agents in a cluster are the ones that can see at least one task.
+
+                    For each agent a in agents that can see a task, check its view for other agents that can also see a task
+                    and perform a round robin among them to pick a single centroid. This is done by performing "leader election"
+                    by picking the agent that has the highest agent ID.
+
+                """
+                # #print("RR:")
+                for a in agents:
+                    if len(a.clusterID) > 0:
+                        for x in a.viewAgents:
+                            if len(x.clusterID) > 0  and x != a:
+                                if x.ID > a.ID:
+                                    a.clusterID_prime = []
+                                    a.children_prime = []
+                                    a.parent_prime = None
+
+
+                    # #print("RR Clusters: ", a.clusterID, a.posX, a.posY)
+
+                mergeTimelines()
+
+                for i in range(psi):
+                    """
+                    Begin Phase 3:
+                    ----------------------------
+
+                    For each agent a that does not belong to any cluster, 
+                    search its view for agents that are already in a cluster
+                    and add a to be their children/join their cluster.
+
+                    """
+                    for a in agents:
+                        if len(a.clusterID) == 0:
+                            for x in a.viewAgents:
+                                if len(x.clusterID) > 0 and  x != a:
+                                    a.clusterID_prime.append(x.clusterID[0])
+                                    a.parent_prime = x
+                                    a.color_prime = x.color
+                                    a.gui_split = True
+
+                                    if a not in x.children and a != x:
+                                        x.children_prime.append(a)
+
+                    mergeTimelines()
+                    if verbose:
+                        print("Phase 3: ")
+                        for a in agents:
+                            print(a.ID, a.clusterID)
+
+                    """
+                    Begin Phase 4:
+                    ----------------------------
+
+                    If an agent a is part of more than one cluster, then it
+                    becomes a centroid and forms a new Super Cluster that
+                    contains all agents in both clusters.
+
+                    """
+                    for a in agents:
+                        ## delete duplicates...
+                        a.clusterID = list(set(a.clusterID))
+                        if len(a.clusterID) > 1:
+                            a.clusterID_prime = [a.ID] ## become the new centroid...
+                            a.message_prime = True
+                            a.parent_prime = None ## no parent for centroids...
+                            a.color_prime = colors.pop(0)
+                            a.gui_split = True
+
+                            for x in a.viewAgents:
+                                if x.message == False and x != a:
+                                    x.clusterID_prime = [a.ID]
+                                    x.message_prime = True ## now x has received the message about the new centroid...
+                                    x.parent_prime = a ## a is the new parent...
+                                    x.color_prime = a.color ## get a's color...
+                                    x.gui_split = True
+
+                                    if x not in a.children:
+                                        a.children_prime.append(x)
+                                    x.children_prime = []
+
+                    mergeTimelines()
+                    if verbose:
+                        print("Phase 4: ")
+                        for a in agents:
+                            print(a.ID, a.clusterID)
+
+                    """
+                    Begin Phase 4.5:
+                    ----------------------------
+
+                    Maintain consistency among parent-child relationships.
+
+                    """
+                    for i in range(2,N):
+                        for a in agents:
+                            if len(a.clusterID) > 0:
+                                if a.parent != None:
+                                    a.clusterID_prime = a.parent.clusterID
+                                    a.color_prime = a.parent.color
+                                    if a not in a.parent.children:
+                                        a.parent.children_prime.append(a)
+
+                        mergeTimelines()
+                    ## perform a final visualizer update
+                    for a in agents:
+                        if len(a.clusterID) > 0:
+                            a.gui_split = True
+                    mergeTimelines()
+
+
+                    for i in range(2,N):
+                        """
+                        Begin Phase 5:
+                        ----------------------------
+
+                        Transfer the message that a new cluster has been 
+                        formed to all children of agents within the super
+                        cluster's centroid view using the message flag.
+
+                        """
+                        for a in agents:
+                            if a.message == True:
+                                for x in a.viewAgents:
+                                    if x.message == False and x != a:
+                                        x.clusterID_prime = a.clusterID.copy()
+                                        x.message_prime = True
+                                        x.parent_prime = a
+                                        x.color_prime = a.color
+                                        x.gui_split = True
+
+                                        if x not in a.children:
+                                            a.children_prime.append(x)
+                                        x.chilren_prime = []
+
+                        mergeTimelines()
+
+                """
+                Begin Phase 6:
+                ----------------------------
+
+                Reset message flag for all agents
+
+                """
+                for a in agents:
+                    a.message = False
+
+                """
+                Begin Phase 7: 
+                ----------------------------
+
+                Remove any stray children. 
+
+                """
+                for a in agents:
+                    if a.parent != None and len(a.clusterID) > 0:
+                        for b in a.viewAgents:
+                            if b != a and b != a.children: 
+                                if a in b.children: 
+                                    b.children.remove(a)
+
+                time.sleep(wait_time)
+
+                """
+                Begin Phase 8: 
+                ----------------------------
+
+                !!! This phase should not be necessary if everything 
+                    above works correctly. (Right?)
+
+                Assert that all colors match to clusterID number. 
+
+                """
+                for _ in range(N):
+                    for a in agents:
+                        if a.parent != None:
+                            a.color_prime = a.parent.color
+                            if a.color != a.parent.color:
+                                ## only update visualizer if color changes
+                                a.gui_split = True
+                    mergeTimelines()
+
+                break
         except KeyboardInterrupt:
             sys.exit(0)
-
 
 #Driver
 def start():
