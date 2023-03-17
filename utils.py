@@ -220,6 +220,39 @@ def bfsFindAgents(networkVertices, networkEdges, source, agentVertices):
 
     return False
 
+def bfsNearestTask(networkVertices, networkEdges, source, taskVertices):
+    Q = []
+    labels = {}
+    prev = {}
+    prev[str(source)] = None
+    dist = -1
+
+    for v in networkVertices:
+        labels[str(v)] = False
+
+    Q.append(source)
+    labels[str(source)] = True
+    while(len(Q)) > 0:
+        v = Q.pop(0)
+
+        for edge in networkEdges:
+            if edge[0] == v:
+                if labels[str(edge[1])] == False:
+                    labels[str(edge[1])] = True
+                    prev[str(edge[1])] = v
+                    Q.append(edge[1])
+                    if edge[1] in taskVertices:
+                        t = edge[1]
+                        if prev[str(t)] != None or t==source:
+                            path = []
+                            while t != None:
+                                path.append(t)
+                                t = prev[str(t)]
+                                dist += 1
+                        return dist, list(reversed(path))
+
+    return None,None
+
 def dirShortestPath(networkVertices,networkEdges,source,target):
     Q=[]
     dist={}

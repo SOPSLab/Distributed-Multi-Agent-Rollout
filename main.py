@@ -13,7 +13,7 @@ import threading
 import utils as ut
 from init import getParameters
 
-wait_time = 0
+wait_time = 0.5
 
 totalCost = 0
 padding = 20
@@ -594,6 +594,13 @@ def stateUpdate():
             a.setYPos(a.posY-1)
         elif a.getDir() == 'n':
             a.setYPos(a.posY+1)
+        elif a.getDir() == 'q':
+            pass
+        else:
+            raise ValueError("Incorrect direction. ")
+
+        if visualizer:
+            changeCell(a.posX, a.posY, 'agent', a.color)
 
         if (a.posX, a.posY) in taskVertices:
             taskVertices.remove((a.posX, a.posY))
@@ -761,146 +768,200 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
         ret= 'q'
     return ret,minCost
 
-def multiAgentRollout(networkVertices,networkEdges,networkAgents,taskPos,agent,prevMoves):
-    currentPos={}
-    for a in networkAgents: ## a is actually a.ID...
-        currentPos[a]=(agents[a-1].posX-networkAgents[a][0],agents[a-1].posY-networkAgents[a][1])
-    currentTasks=taskPos.copy()
+def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
+    currentPos = networkAgents.copy()
+    currentTasks = taskPos.copy()
 
-    prevCost=0
-    for a_ID in networkAgents:
-        # #print("moved", a_ID)
-        a = agents[a_ID-1]
-        if a in prevMoves:
-            if prevMoves[a]=='n':
-                currentPos[a_ID]=(currentPos[a_ID][0],currentPos[a_ID][1]+1)
-            if prevMoves[a]=='s':
-                currentPos[a_ID]=(currentPos[a_ID][0],currentPos[a_ID][1]-1)
-            if prevMoves[a]=='e':
-                currentPos[a_ID]=(currentPos[a_ID][0]+1,currentPos[a_ID][1])
-            if prevMoves[a]=='w':
-                currentPos[a_ID]=(currentPos[a_ID][0]-1,currentPos[a_ID][1])
-            if prevMoves[a]=='q': ## wait move
-                currentPos[a_ID]=(currentPos[a_ID][0], currentPos[a_ID][1])
-            if currentPos[a_ID] in currentTasks:
-                currentTasks.remove(currentPos[a_ID])
+    assert len(currentTasks) > 0
+    minCost = float('inf')
+    bestMove = None
+    Qfactors = []
+    prevCost = 0
 
     agent_ID = list(agent.keys())[0]
-    agent_posX = agents[agent_ID-1].posX - agent[agent_ID][0]
-    agent_posY = agents[agent_ID-1].posY - agent[agent_ID][1]
-    x_offset = agent[agent_ID][0]
-    y_offset = agent[agent_ID][1]
-    agent_prev_move = agents[agent_ID-1].prev_move
-    if len(currentTasks)==0:
-        return 'q', 0
-    assert len(currentTasks)>0
-    minCost=float('inf')
-    bestMove=None
-    Qfactors=[]
-    #print(networkEdges)
+    agent_pos = agent[agent_ID]
+
     for e in networkEdges:
+        assert e[0] in networkVertices
         assert e[1] in networkVertices
-        if e[0]==(agent_posX,agent_posY):
-            tempCurrentTasks=currentTasks.copy()
-            tempPositions=currentPos.copy()
+        if e[0]==agent_pos:
+            if '3' in verbose or verbose == '-1':
+                print("EOI: ", e)
+            tempCurrentTasks = currentTasks.copy()
+            tempPositions = currentPos.copy()
+
             if e[1] != e[0]:
-                cost=prevCost+1
+                cost = prevCost+1
             else:
-                cost=prevCost
-            tempPositions[agent_ID]=e[1]
+                cost = prevCost+0.1
+
+            tempPositions[agent_ID] = e[1]
             if tempPositions[agent_ID] in tempCurrentTasks:
-                # cost -= 100
                 tempCurrentTasks.remove(tempPositions[agent_ID])
+            if '3' in verbose or verbose == '-1':
+                print("Task List: ", tempCurrentTasks)
 
-            rounds = 0
-            while len(tempCurrentTasks)>0:
-                if rounds >= len(networkVertices) + len(networkEdges):
-                    cost += len(networkVertices) + len(networkEdges)
-                    break
-                for a in networkAgents:
-                    if (a in prevMoves.keys() and prevMoves[a] != 'q') or (a not in prevMoves.keys()):
-                        shortestDist=float('inf')
-                        bestNewPos=None
+            while len(tempCurrentTasks) > 0:
+                if '3' in verbose or verbose == '-1':
+                    print("\tRemaining Tasks: ", len(tempCurrentTasks))
+                for a_ID in networkAgents:
+                    if a_ID not in waitAgents:
+                        shortestDist = float('inf')
+                        bestNewPos = None
 
-                        for t in tempCurrentTasks:
-                            a_pos = (tempPositions[a][0]+x_offset,tempPositions[a][1]+y_offset)
-                            t_pos = (t[0]+x_offset,t[1]+y_offset)
-                            dist, path = offlineTrainRes[str(a_pos)][str(t_pos)]
-                            if dist<shortestDist:
-                                shortestDist=dist
-                                bestNewPos=path
-                        if bestNewPos != None:
-                            if (e[1] != (agent_posX,agent_posY)) or (agent_ID != a):
-                                #print(a_pos, t_pos, bestNewPos, vertices)
-                                tempPositions[a]=(bestNewPos[0]-x_offset,bestNewPos[1]-y_offset)
-                                cost += 1
-                        if tempPositions[a] in tempCurrentTasks:
-                            # cost -= 100
-                            tempCurrentTasks.remove(tempPositions[a])
-                            #print("\tRemoving...", tempPositions[a], tempCurrentTasks)
-                        rounds += 1
-                        if len(tempCurrentTasks)==0:
-                            break
-            if cost<minCost:
-                minCost=cost
-                bestMove=e[1]
+                        assert tempPositions[a_ID] in networkVertices
+                        dist, path = ut.bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
+                        
+                        if dist == None:
+                            """
+                                should only arise if an agent is alone 
+                                in a connected component
+                            """
+                            bestNewPos = tempPositions[a_ID]
+                        else:
+                            bestNewPos = path[1]
+                        if '3' in verbose or verbose == '-1':
+                            print(f"\tAgent {tempPositions[a_ID]} moves " +
+                            f"to {bestNewPos}")
+                        assert bestNewPos != None
 
-            Qfactors.append((e[1],cost))
+                        tempPositions[a_ID] = bestNewPos
+                        cost += 1
+                        if tempPositions[a_ID] in tempCurrentTasks:
+                            tempCurrentTasks.remove(tempPositions[a_ID])
+            if '3' in verbose or verbose == '-1':
+                print("\tCost-to-go for EOI: ", cost)
+
+            if cost < minCost:
+                minCost = cost
+                bestMove = e[1]
+
+            Qfactors.append((e[1], cost))
             del tempPositions
             del tempCurrentTasks
 
-    assert bestMove!=None
+    assert bestMove != None     ## should at least wait... 
+
     minQ = float('inf')
     for factor in Qfactors:
         if factor[1] < minQ:
             minQ = factor[1]
 
-    ## collect all ties...
+    """
+    Note: 
+    ---------------------------
+
+    Not asserting that agents not move back to previous positions
+    as we know that there can be oscillations of larger periods and
+    we can't check all possible periods. 
+
+    Oscillations should implicitly not occur. 
+
+    """
+
+    ## collect ties in Qfactor values
     ties = []
     for factor in Qfactors:
-         if factor[1] == minQ:
-             if factor[0]==(agent_posX+1,agent_posY):
-                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('e') != agent_prev_move):
-                     ties.append((factor,'e'))
-             elif factor[0]==(agent_posX-1,agent_posY):
-                 if ((agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('w') != agent_prev_move)):
-                     ties.append((factor,'w'))
-             elif factor[0]==(agent_posX,agent_posY+1):
-                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('s') != agent_prev_move):
-                     ties.append((factor,'s'))
-             elif factor[0]==(agent_posX,agent_posY-1):
-                 if (agent_prev_move == None) or (agent_prev_move != None and getOppositeDirection('n') != agent_prev_move):
-                     ties.append((factor,'n'))
-             elif factor[0]==(agent_posX,agent_posY):
-                 ties.append((factor,'q'))
+        if factor[1] == minQ:
+            ties.append(factor)
 
-    if len(ties) == 0:
-         for factor in Qfactors:
-             if factor[1] == minQ:
-                 if factor[0]==(agent_posX+1,agent_posY):
-                     ties.append((factor,'e'))
-                 elif factor[0]==(agent_posX-1,agent_posY):
-                     ties.append((factor,'w'))
-                 elif factor[0]==(agent_posX,agent_posY+1):
-                     ties.append((factor,'n'))
-                 elif factor[0]==(agent_posX,agent_posY-1):
-                     ties.append((factor,'s'))
-                 elif factor[0]==(agent_posX,agent_posY):
-                     ties.append(factor,'q')
+    assert len(ties) >= 1 ## some move must get finite cost
+    if '3' in verbose or verbose == '-1':
+        print(agent_ID, agents[agent_ID-1].posX, agents[agent_ID-1].posY
+            , ties, waitAgents)
 
-    bestMove = ties[0][0][0]
+    """
+    Question: 
+    ---------------------------
 
-    if bestMove==(agent_posX+1,agent_posY):
-        ret= 'e'
-    elif bestMove==(agent_posX-1,agent_posY):
-        ret= 'w'
-    elif bestMove==(agent_posX,agent_posY+1):
-        ret= 'n'
-    elif bestMove==(agent_posX,agent_posY-1):
-        ret= 's'
-    elif bestMove==(agent_posX,agent_posY):
-        ret= 'q' ## wait move
-    return ret,minCost
+    If we don't break ties randomly, then why bother creating a
+    list of ties and selecting the i-th  Qfactor (for some i)? 
+
+    """
+
+    """
+    Note: 
+    ---------------------------
+
+    Breaking ties by picking the wait-move if possible, 
+    otherwise pick the last move in the ties list. 
+
+    """
+    for factor in ties:
+        bestMove = factor[0]
+        if factor[0] == agent_pos:
+            break
+
+    if bestMove == (agent_pos[0]+1,agent_pos[1]):
+        ret = 'e'
+    elif bestMove == (agent_pos[0]-1,agent_pos[1]):
+        ret = 'w'
+    elif bestMove == (agent_pos[0],agent_pos[1]+1):
+        ret = 'n'
+    elif bestMove == (agent_pos[0],agent_pos[1]-1):
+        ret = 's'
+    elif bestMove == agent_pos:
+        ret = 'q'
+
+    if '3' in verbose or verbose == '-1':
+        print("Move choice: ", ret)
+        print()
+    return ret, minCost
+
+def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkAgents, taskPos, agent):
+    (x_offset, y_offset) = agent[centroidID]
+    agentPositions = {}
+    for a_ID in networkAgents:
+        agentPositions[a_ID] = (agents[a_ID-1].posX-networkAgents[a_ID][0],
+                                agents[a_ID-1].posY-networkAgents[a_ID][1])
+    tempTasks = taskPos.copy()
+
+    allPrevMoves = {}
+    for a_ID in networkAgents:
+        allPrevMoves[a_ID] = []
+
+    while len(tempTasks) > 0:
+        waitAgents = []
+        prevMoves = {}
+        for a_ID in networkAgents:
+            agent_pos = agentPositions[a_ID]
+            assert agent_pos in networkVertices
+            if only_base_policy:
+                ## need to move to global coordinates
+                taskList = [(task[0]+x_offset,task[1]+y_offset) for task \
+                            in tempTasks]
+                global_temp_pos = (agentPositions[a_ID][0]+x_offset,
+                                    agentPositions[a_ID][1]+y_offset)
+                move,c = getClosestClusterTask(global_temp_pos,
+                                                taskList, offlineTrainRes)
+            else:
+                move,c = multiAgentRollout(networkVertices, networkEdges,
+                                        agentPositions, tempTasks, 
+                                        {a_ID:agent_pos}, 
+                                        waitAgents)
+            prevMoves[a_ID] = move
+            allPrevMoves[a_ID].append(move)
+            if move == 'n':
+                agentPositions[a_ID] = (agent_pos[0],agent_pos[1]+1)
+            elif move == 's':
+                agentPositions[a_ID] = (agent_pos[0],agent_pos[1]-1)
+            elif move == 'e':
+                agentPositions[a_ID] = (agent_pos[0]+1,agent_pos[1])
+            elif move == 'w':
+                agentPositions[a_ID] = (agent_pos[0]-1,agent_pos[1])
+            elif move == 'q':
+                waitAgents.append(a_ID)
+                pass
+
+            if agentPositions[a_ID] in tempTasks:
+                tempTasks.remove(agentPositions[a_ID])
+
+            if len(tempTasks) == 0:
+                break
+
+    if '3' in verbose or verbose == '-1':
+        print("allPrevMoves: ", allPrevMoves)
+    return allPrevMoves
 
 def mergeTimelines():
     # #print("Merging... ")
@@ -952,24 +1013,22 @@ def mergeTimelines():
                 if agent in x.children:
                     x.children.remove(agent)
 
-def getClosestClusterTask(agent, taskVertices, lookupTable):
+def getClosestClusterTask(agent_pos, taskList, lookupTable):
+    (agent_posX, agent_posY) = agent_pos
     min_dist = float('inf')
     best_move = None
-    for task in taskVertices:
-        try:
-            dist, path = lookupTable[str((agent.posX, agent.posY))][str(task)]
-        except (AssertionError, KeyError):
-            continue
-        if dist < min_dist:
+    for task in taskList:
+        dist, path = lookupTable[str((agent_posX, agent_posY))][str(task)]
+        if dist != None and dist < min_dist:
             min_dist = dist
             best_move = path
-    if best_move == (agent.posX+1, agent.posY):
+    if best_move == (agent_posX+1, agent_posY):
         next_dir = 'e'
-    elif best_move == (agent.posX-1, agent.posY):
+    elif best_move == (agent_posX-1, agent_posY):
         next_dir = 'w'
-    elif best_move == (agent.posX, agent.posY-1):
+    elif best_move == (agent_posX, agent_posY-1):
         next_dir = 's'
-    elif best_move == (agent.posX, agent.posY+1):
+    elif best_move == (agent_posX, agent_posY+1):
         next_dir = 'n'
     elif best_move == None:
         next_dir = 'q'
@@ -1028,7 +1087,7 @@ def main():
             explore_steps = 0
 
             rounds = 0
-            COMPLETION_PARAM = 0.1
+            COMPLETION_PARAM = 0.0
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
             while len(taskVertices) > target_completion:
                 time.sleep(wait_time)
@@ -1090,9 +1149,27 @@ def main():
                                     a.clusterID_prime = []
                                     a.children_prime = []
                                     a.parent_prime = None
+                mergeTimelines()
+                if '1' in verbose or verbose == '-1':
+                        print("Phase RR: ")
+                        for a in agents:
+                            print(a.ID, a.posX, a.posY, 
+                                a.color, a.clusterID, end=" ")
+                            if a.parent != None:
+                                print(a.parent.ID)
+                            else:
+                                print()
+                            print("\tChildren: ", end=" ")
+                            for b in a.children:
+                                print(b.ID, end=" ")
+                            print()
+                        print()
 
-
-                    # #print("RR Clusters: ", a.clusterID, a.posX, a.posY)
+                ## Update colors for centroids...
+                for a in agents:
+                    if len(a.clusterID) > 0 and a.ID == a.clusterID[0]:
+                        a.color_prime = colors.pop(0)
+                        a.gui_split = True
 
                 mergeTimelines()
 
@@ -1119,6 +1196,20 @@ def main():
                                         x.children_prime.append(a)
 
                     mergeTimelines()
+                    if '1' in verbose or verbose == '-1':
+                        print("Phase 3: ")
+                        for a in agents:
+                            print(a.ID, a.posX, a.posY, 
+                                a.color, a.clusterID, end=" ")
+                            if a.parent != None:
+                                print(a.parent.ID)
+                            else:
+                                print()
+                            print("\tChildren: ", end=" ")
+                            for b in a.children:
+                                print(b.ID, end=" ")
+                            print()
+                        print()
 
                     """
                     Begin Phase 4:
@@ -1152,6 +1243,20 @@ def main():
                                     x.children_prime = []
 
                     mergeTimelines()
+                    if '1' in verbose or verbose == '-1':
+                        print("Phase 4: ")
+                        for a in agents:
+                            print(a.ID, a.posX, a.posY, 
+                                a.color, a.clusterID, end=" ")
+                            if a.parent != None:
+                                print(a.parent.ID)
+                            else:
+                                print()
+                            print("\tChildren: ", end=" ")
+                            for b in a.children:
+                                print(b.ID, end=" ")
+                            print()
+                        print()                    
 
                     """
                     Begin Phase 4.5:
@@ -1175,6 +1280,20 @@ def main():
                         if len(a.clusterID) > 0:
                             a.gui_split = True
                     mergeTimelines()
+                    if '1' in verbose or verbose == '-1':
+                        print("Phase 4.5: ")
+                        for a in agents:
+                            print(a.ID, a.posX, a.posY, 
+                                a.color, a.clusterID, end=" ")
+                            if a.parent != None:
+                                print(a.parent.ID)
+                            else:
+                                print()
+                            print("\tChildren: ", end=" ")
+                            for b in a.children:
+                                print(b.ID, end=" ")
+                            print()
+                        print()
 
 
                     for i in range(2,N):
@@ -1206,12 +1325,13 @@ def main():
                 if '1' in verbose or verbose == '-1':
                     print("Phase 5: ")
                     for a in agents:
-                        print(a.ID, a.color, a.clusterID, end=" ")
+                        print(a.ID, a.posX, a.posY, 
+                            a.color, a.clusterID, end=" ")
                         if a.parent != None:
                             print(a.parent.ID)
                         else:
                             print()
-                        print("Children: ", end=" ")
+                        print("\tChildren: ", end=" ")
                         for b in a.children:
                             print(b.ID, end=" ")
                         print()
@@ -1246,7 +1366,8 @@ def main():
                 if '1' in verbose or verbose == '-1':
                     print("Phase 7: ")
                     for a in agents:
-                        print(a.ID, a.color, a.clusterID, end=" ")
+                        print(a.ID, a.posX, a.posY, 
+                            a.color, a.clusterID, end=" ")
                         if a.parent != None:
                             print(a.parent.ID)
                         else:
@@ -1279,12 +1400,13 @@ def main():
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
                     for a in agents:
-                        print(a.ID, a.color, a.clusterID, end=" ")
+                        print(a.ID, a.posX, a.posY, 
+                            a.color, a.clusterID, end=" ")
                         if a.parent != None:
                             print(a.parent.ID)
                         else:
                             print()
-                        print("Children: ", end=" ")
+                        print("\tChildren: ", end=" ")
                         for b in a.children:
                             print(b.ID, end=" ")
                         print()
@@ -1453,163 +1575,76 @@ def main():
                 """
                 if '3' in verbose or verbose == '-1':
                     print("Beginning T-MAR... ")
+                clusterMoves = {}
                 for a in agents:
-                    if '3' in verbose or verbose == '-1':
-                        print(len(a.clusterVertices),len(vertices))
                     if a.parent==None and len(a.clusterID)>0:
-                        for b in a.clusterAgents:
-                            if b==a.ID:
-                                agent={b: a.clusterAgents[b]}
-                        if '3' in verbose or verbose == '-1':
-                            print("Multi: ", a.ID, a.posX, a.posY, 
-                                    a.clusterTasks, a.clusterAgents)
-                        cluster_centroid = agents[a.clusterID[0]-1]
-                        if only_base_policy:
-                            true_tasks = set([(task[0]+cluster_centroid.posX, task[1]+cluster_centroid.posY) for task in list(a.clusterTasks)])
-                            move,c = getClosestClusterTask(a, true_tasks, lookupTable)
-                        else:
-                            move,c=multiAgentRollout(list(a.clusterVertices),
-                                                     list(a.clusterEdges),
-                                                     (a.clusterAgents),
-                                                     list(a.clusterTasks),
-                                                     agent,a.moveList)
-                        a.move(move)
-                        if '3' in verbose or verbose == '-1':
-                            print("First: ", a.ID, a.posX, a.posY, move)
-                        a.moveList[a]=move
-                        if move != 'q': ## not a wait move
-                            totalCost+=1
-                        else:
-                            waitCost += 1
-                        a.marker=True
-                        flag=False
-                        for b in a.children:
-                            if b.marker==False:
-                                flag=True
-                                b.dfsNext=True
-                                b.moveList=a.moveList.copy()
-                                b.clusterVertices=a.clusterVertices.copy()
-                                b.clusterEdges=a.clusterEdges.copy()
-                                b.clusterTasks=a.clusterTasks.copy()
-                                b.clusterAgents=copy.deepcopy(a.clusterAgents)
+                        agent = {a.ID: a.clusterAgents[a.ID]}
+                        clusterMoves[a.ID] = clusterMultiAgentRollout(a.ID, 
+                                                            list(a.clusterVertices),
+                                                            list(a.clusterEdges),
+                                                            a.clusterAgents,
+                                                            list(a.clusterTasks),
+                                                            agent)
 
-                                """
-                                b_agents = set(b.clusterAgents.values())
-                                b_tasks = set(b.clusterTasks)
-                                print("Working???", b_agents, b_tasks, b_agents.intersection(b_tasks))
-                                if len(b_agents.intersection(b_tasks)) != 0:
-                                    print("ALERT, ALERT!!! ", b_agents.intersection(b_tasks))
-                                    raise AssertionError
-                                # for i in range(len(b.clusterAgents)):
-                                #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
-                                break
-                                """
-
+                ## pass this moves list to all agents in agent tree
+                if '3' in verbose or verbose == '-1':
+                    print("Done.", clusterMoves)
+                ## Pass this information to all children
+                for a in agents:
+                    if a.parent == None and len(a.clusterID) > 0:
+                        a.message = True
+                        a.moves = clusterMoves[a.ID][a.ID]
+                    else:
+                        a.message = False
                 for i in range(N):
+                    ## centroid shares this information with its children
                     for a in agents:
-                        if a.dfsNext:
-                            a.dfsNext=False
-                            if not a.marker:
-                                for b in a.clusterAgents:
-                                    if b==a.ID:
-                                        agent={b: a.clusterAgents[b]}
-                                ##print('ID '+str(a.ID))
-                                ##print(a.clusterVertices)
-                                ##print(a.clusterEdges)
-                                # #print("MR: ", a.posX, a.posY, a.clusterTasks)
-                                # for edge in a.clusterEdges:
-                                #   if edge[0] == (agents[b-1].posX,agents[b-1].posY):
-                                #       #print(edge)
-                                cluster_centroid = agents[a.clusterID[0]-1]
-                                if only_base_policy:
-                                    true_tasks = set([(task[0]+cluster_centroid.posX, task[1]+cluster_centroid.posY) for task in list(a.clusterTasks)])
-                                    move,c = getClosestClusterTask(a, true_tasks, lookupTable)
-                                else:
-                                    move,c=multiAgentRollout(list(a.clusterVertices),
-                                                             list(a.clusterEdges),
-                                                             (a.clusterAgents),
-                                                             list(a.clusterTasks),
-                                                             agent,a.moveList)
-                                a.move(move)
-                                if '3' in verbose or verbose == '-1':
-                                    print("Second: ", a.ID, a.posX, a.posY, move)
-                                a.moveList[a]=move
-                                if move != 'q': ## not a wait move
+                        if a.message == True:
+                            for b in a.children:
+                                if b.message == False:
+                                    ## receive move information from parent
+                                    b.moves = clusterMoves[b.clusterID[0]][b.ID]
+                                    b.message = True
+
+                num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
+                num_iterations = 2
+                for i in range(num_iterations):
+                    if '3' in verbose or verbose == '-1':
+                        print("=======Round: ", i)
+                        print(len(taskVertices), num_iterations, totalCost)
+                    if len(taskVertices) == 0:
+                        break
+                    for a in agents:
+                        if a.exp_dist_remaining != 0:
+                            a.clusterID = []
+
+                    for a in agents:
+                        if len(a.clusterID)==0:
+                            a.updateView()
+                            if len(a.viewTasks) == 0:
+                                a.dir=getExplorationMove(a, lookupTable)
+                                if a.dir != 'q':
+                                    if verbose == 'x':
+                                        print(a.ID, a.dir)
                                     totalCost+=1
+                                    explore_steps += 1
                                 else:
                                     waitCost += 1
-                                a.marker=True
-                                flag=False
-                                for b in a.children:
-                                    if b.marker==False:
-                                        flag=True
-                                        b.dfsNext=True
-                                        b.moveList=a.moveList.copy()
-                                        b.clusterVertices=a.clusterVertices.copy()
-                                        b.clusterEdges=a.clusterEdges.copy()
-                                        b.clusterTasks=a.clusterTasks.copy()
-                                        b.clusterAgents=copy.deepcopy(a.clusterAgents)
-                                        # for i in range(len(b.clusterAgents)):
-                                        #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
-                                        break
-                                #Send up to parent
-                                if not flag and a.parent!=None:
-                                    a.parent.dfsNext=True
-                                    a.parent.moveList=a.moveList.copy()
-                                    a.parent.clusterVertices=a.clusterVertices.copy()
-                                    a.parent.clusterEdges=a.clusterEdges.copy()
-                                    a.parent.clusterTasks=a.clusterTasks.copy()
-                                    a.parent.clusterAgents=copy.deepcopy(a.clusterAgents)
-                                    # for i in range(len(a.parent.clusterAgents)):
-                                    #   a.parent.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
                             else:
-                                flag=False
-                                for b in a.children:
-                                    if b.marker==False:
-                                        flag=True
-                                        b.dfsNext=True
-                                        b.moveList=a.moveList.copy()
-                                        b.clusterVertices=a.clusterVertices.copy()
-                                        b.clusterEdges=a.clusterEdges.copy()
-                                        b.clusterTasks=a.clusterTasks.copy()
-                                        b.clusterAgents=copy.deepcopy(a.clusterAgents)
-                                        # for i in range(len(b.clusterAgents)):
-                                        #   b.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
-                                        break
-                                #Send up to parent
-                                if not flag and a.parent!=None:
-                                    a.parent.dfsNext=True
-                                    a.parent.moveList=a.moveList.copy()
-                                    a.parent.clusterVertices=a.clusterVertices.copy()
-                                    a.parent.clusterEdges=a.clusterEdges.copy()
-                                    a.parent.clusterTasks=a.clusterTasks.copy()
-                                    a.parent.clusterAgents=copy.deepcopy(a.clusterAgents)
-                                    # for i in range(len(a.parent.clusterAgents)):
-                                    #   a.parent.clusterAgents[i].copy_number = a.clusterAgents[i].copy_number + 1
-
-                for a in agents:
-                    if a.exp_dist_remaining != 0:
-                        a.clusterID = []
-
-                for a in agents:
-                    if len(a.clusterID)==0:
-                        #print("Exploring... ", a.posX, a.posY)
-                        a.dir=getExplorationMove(a, lookupTable)
-                        if a.dir != 'q':
-                            totalCost+=1
-                            explore_steps += 1
+                                a.dir = 'q'
+                                waitCost += 1
                         else:
-                            if verbose == '-1':
-                                print(f"Move: {a.ID}, {a.dir}, {a.exp_dir}")
-                            waitCost += 1
-                    else:
-                        if verbose == '-1':
-                            print(f"Move: {a.ID}, {a.dir}, {a.exp_dir}")
-
-                # for a in agents:
-                #   #print("Post: ", a.posX, a.posY, a.dir)
-
-                stateUpdate()
+                            try:
+                                a.dir = a.moves.pop(0)
+                                if a.dir != 'q':
+                                    totalCost += 1
+                                else:
+                                    waitCost += 1
+                            except IndexError:
+                                a.dir = 'q'
+                                waitCost += 1
+                    stateUpdate()
+                    time.sleep(wait_time)
 
                 for a in agents:
                     a.deallocate()
@@ -1640,6 +1675,13 @@ def main():
 
         except KeyboardInterrupt:
             sys.exit(0)
+
+    new_data['Total Cost'] = str(totalCost)
+    new_data['Total Time (s)'] = str(totalTime)
+    if verbose == '-1':
+        print(new_data)
+    print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
+     f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
 
 #Driver
 def start():
