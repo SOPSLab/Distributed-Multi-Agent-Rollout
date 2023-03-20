@@ -288,5 +288,4 @@ def dirShortestPath(networkVertices,networkEdges,source,target):
                 if alt < dist[str(e[1])]:
                     dist[str(e[1])]=alt
                     prev[str(e[1])]=u
-
-
+    return None, None

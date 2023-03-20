@@ -13,18 +13,19 @@ import threading
 import utils as ut
 from init import getParameters
 
-wait_time = 0.5
+wait_time = 0
 
 totalCost = 0
 padding = 20
 
 rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
-seed, collisions, exp_strat, only_base_policy, verbose = getParameters()
+seed, collisions, exp_strat, only_base_policy, verbose, depots = getParameters()
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
             '# of Agents': str(A), '# of Tasks': str(numTasks), 'k': str(k),
-            'psi': str(psi), 'Only Base Policy': str(only_base_policy)}
+            'psi': str(psi), 'Only Base Policy': str(only_base_policy),
+            'Depots': str(depots)}
 
 if visualizer:
     root = Tk()
@@ -932,8 +933,11 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                             in tempTasks]
                 global_temp_pos = (agentPositions[a_ID][0]+x_offset,
                                     agentPositions[a_ID][1]+y_offset)
-                move,c = getClosestClusterTask(global_temp_pos,
-                                                taskList, offlineTrainRes)
+                move,c = getClosestClusterTask(agent_pos=agentPositions[a_ID], 
+                                                taskList=tempTasks, 
+                                                lookupTable=None,
+                                                vertices=networkVertices,
+                                                edges=networkEdges)
             else:
                 move,c = multiAgentRollout(networkVertices, networkEdges,
                                         agentPositions, tempTasks, 
@@ -959,8 +963,54 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
             if len(tempTasks) == 0:
                 break
 
+    longest = 0
+    for a_ID in allPrevMoves:
+        if len(allPrevMoves[a_ID]) > longest:
+            longest = len(allPrevMoves[a_ID])
+
+    for a_ID in allPrevMoves:
+        while len(allPrevMoves[a_ID]) < longest:
+            allPrevMoves[a_ID].append('q')
+
     if '3' in verbose or verbose == '-1':
         print("allPrevMoves: ", allPrevMoves)
+
+    """
+    If we are using depots to return to, then we need to 
+    route all agents back to the original position of the 
+    leader agent. 
+
+    Note that the original position of the leader is simply
+    the tuple (0,0) in the local view. 
+
+    """
+    if depots:
+        for a_ID in agentPositions:
+            while agentPositions[a_ID] != (0,0):
+                dist,path = ut.dirShortestPath(networkVertices, networkEdges,
+                                            agentPositions[a_ID], 
+                                            (0,0))
+                assert dist != None 
+                newPos = path[1]
+                if newPos == (agentPositions[a_ID][0],agentPositions[a_ID][1]+1):
+                    allPrevMoves[a_ID].append('n')
+                    agentPositions[a_ID] = (agentPositions[a_ID][0],
+                                            agentPositions[a_ID][1]+1)
+                elif newPos == (agentPositions[a_ID][0],agentPositions[a_ID][1]-1):
+                    allPrevMoves[a_ID].append('s')
+                    agentPositions[a_ID] = (agentPositions[a_ID][0],
+                                            agentPositions[a_ID][1]-1)
+                elif newPos == (agentPositions[a_ID][0]+1,agentPositions[a_ID][1]):
+                    allPrevMoves[a_ID].append('e')
+                    agentPositions[a_ID] = (agentPositions[a_ID][0]+1,
+                                            agentPositions[a_ID][1])
+                elif newPos == (agentPositions[a_ID][0]-1,agentPositions[a_ID][1]):
+                    allPrevMoves[a_ID].append('w')
+                    agentPositions[a_ID] = (agentPositions[a_ID][0]-1,
+                                            agentPositions[a_ID][1])
+                else: 
+                    raise ValueError("Agent needs to move.")
+
     return allPrevMoves
 
 def mergeTimelines():
@@ -1013,15 +1063,20 @@ def mergeTimelines():
                 if agent in x.children:
                     x.children.remove(agent)
 
-def getClosestClusterTask(agent_pos, taskList, lookupTable):
+def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
     (agent_posX, agent_posY) = agent_pos
     min_dist = float('inf')
     best_move = None
     for task in taskList:
-        dist, path = lookupTable[str((agent_posX, agent_posY))][str(task)]
+        if lookupTable != None:
+            dist, path = lookupTable[str((agent_posX, agent_posY))][str(task)]
+        else:
+            dist, path = ut.dirShortestPath(kwargs['vertices'], 
+                                            kwargs['edges'],
+                                            agent_pos, task)
         if dist != None and dist < min_dist:
             min_dist = dist
-            best_move = path
+            best_move = path[1]
     if best_move == (agent_posX+1, agent_posY):
         next_dir = 'e'
     elif best_move == (agent_posX-1, agent_posY):
@@ -1030,10 +1085,10 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable):
         next_dir = 's'
     elif best_move == (agent_posX, agent_posY+1):
         next_dir = 'n'
-    elif best_move == None:
+    elif best_move == None: ## isolated agents... 
         next_dir = 'q'
     else:
-        raise ValueError
+        raise ValueError("Best Move is not a move. ")
 
     return next_dir, min_dist
 
@@ -1087,7 +1142,7 @@ def main():
             explore_steps = 0
 
             rounds = 0
-            COMPLETION_PARAM = 0.0
+            COMPLETION_PARAM = 0.1
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
             while len(taskVertices) > target_completion:
                 time.sleep(wait_time)
@@ -1606,12 +1661,15 @@ def main():
                                     b.moves = clusterMoves[b.clusterID[0]][b.ID]
                                     b.message = True
 
-                num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
-                num_iterations = 2
+                ## loose upper bound... 
+                # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
+                num_iterations = (2**psi)*k
                 for i in range(num_iterations):
                     if '3' in verbose or verbose == '-1':
-                        print("=======Round: ", i)
-                        print(len(taskVertices), num_iterations, totalCost)
+                        print("=======Round: {}/{}".format(i, num_iterations))
+                        print(len(taskVertices), totalCost)
+                    if 't' in verbose or verbose == '-1':
+                        print("Remaining Tasks: ", len(taskVertices))
                     if len(taskVertices) == 0:
                         break
                     for a in agents:

@@ -2,7 +2,8 @@ from init import *
 from utils import *
 import time
 
-rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, seed, collisions, exp_strat, _, _ = getParameters()
+rows, cols, A, numTasks, k, psi, centralized, visualizer, \
+wall_prob, seed, collisions, exp_strat, _, _, _ = getParameters()
 assert rows == cols
 size = rows
 

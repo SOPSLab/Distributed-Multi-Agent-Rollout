@@ -209,6 +209,8 @@ def getParameters():
                             action='store_true')
     parser.add_argument('--verbose', required=False, default=0,
                             type=str)
+    parser.add_argument('--depot', required=False, default=False,
+                            action='store_true')
     # parser.add_argument('--seed', required=False, default=1234)
     args = parser.parse_args()
 
@@ -226,6 +228,7 @@ def getParameters():
     exp_strat = args.exp
     only_base_policy = args.only_base_pi
     verbose = (str)(args.verbose)
+    depots = args.depot
     # seed = (int)(args.seed)
 
     assert(numTasks < rows*cols)
@@ -238,7 +241,7 @@ def getParameters():
 
     return rows, cols, numAgents, numTasks, k, psi, centralized, \
             visualizer, wall_prob, seed, collisions, exp_strat, \
-            only_base_policy, verbose
+            only_base_policy, verbose, depots
 
 
 
