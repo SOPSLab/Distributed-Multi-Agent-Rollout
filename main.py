@@ -13,6 +13,8 @@ import threading
 import utils as ut
 from init import getParameters
 
+# random.seed(12345)
+
 wait_time = 0
 
 totalCost = 0
@@ -769,7 +771,13 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
         ret= 'q'
     return ret,minCost
 
-def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
+def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent):
+    for vertex in networkVertices:
+        try:
+            assert (vertex,vertex) in networkEdges
+        except:
+            networkEdges.append((vertex,vertex))
+
     currentPos = networkAgents.copy()
     currentTasks = taskPos.copy()
 
@@ -799,37 +807,59 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             tempPositions[agent_ID] = e[1]
             if tempPositions[agent_ID] in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent_ID])
+            flag = False
+            for a_ID in tempPositions:
+                if len(tempCurrentTasks) == 0:
+                    break
+                if flag == True:
+                    dist,path = ut.bfsNearestTask(networkVertices,networkEdges,
+                                                    tempPositions[a_ID],
+                                                    tempCurrentTasks)
+                    assert dist != None
+                    tempPositions[a_ID] = path[1]
+                    cost += 1
+
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                if flag == False:
+                    flag = True if (a_ID == agent_ID) else False
+
             if '3' in verbose or verbose == '-1':
                 print("Task List: ", tempCurrentTasks)
+                print("Agent Positions:", end=" ")
+                for a_ID in tempPositions:
+                    print(tempPositions[a_ID], end=" ")
+                print()
 
             while len(tempCurrentTasks) > 0:
                 if '3' in verbose or verbose == '-1':
                     print("\tRemaining Tasks: ", len(tempCurrentTasks))
                 for a_ID in networkAgents:
-                    if a_ID not in waitAgents:
-                        shortestDist = float('inf')
-                        bestNewPos = None
+                    shortestDist = float('inf')
+                    bestNewPos = None
 
-                        assert tempPositions[a_ID] in networkVertices
-                        dist, path = ut.bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
-                        
-                        if dist == None:
-                            """
-                                should only arise if an agent is alone 
-                                in a connected component
-                            """
-                            bestNewPos = tempPositions[a_ID]
-                        else:
-                            bestNewPos = path[1]
-                        if '3' in verbose or verbose == '-1':
-                            print(f"\tAgent {tempPositions[a_ID]} moves " +
-                            f"to {bestNewPos}")
-                        assert bestNewPos != None
+                    assert tempPositions[a_ID] in networkVertices
+                    dist, path = ut.bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
+                    
+                    if dist == None:
+                        """
+                            should only arise if an agent is alone 
+                            in a connected component
+                        """
+                        bestNewPos = tempPositions[a_ID]
+                    else:
+                        bestNewPos = path[1]
+                    if '3' in verbose or verbose == '-1':
+                        print(f"\tAgent {tempPositions[a_ID]} moves " +
+                        f"to {bestNewPos}")
+                    assert bestNewPos != None
 
-                        tempPositions[a_ID] = bestNewPos
-                        cost += 1
-                        if tempPositions[a_ID] in tempCurrentTasks:
-                            tempCurrentTasks.remove(tempPositions[a_ID])
+                    tempPositions[a_ID] = bestNewPos
+                    cost += 1
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                    if len(tempCurrentTasks) == 0:
+                        break
             if '3' in verbose or verbose == '-1':
                 print("\tCost-to-go for EOI: ", cost)
 
@@ -869,7 +899,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     assert len(ties) >= 1 ## some move must get finite cost
     if '3' in verbose or verbose == '-1':
         print(agent_ID, agents[agent_ID-1].posX, agents[agent_ID-1].posY
-            , ties, waitAgents)
+            , ties)
 
     """
     Question: 
@@ -942,7 +972,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                 move,c = multiAgentRollout(networkVertices, networkEdges,
                                         agentPositions, tempTasks, 
                                         {a_ID:agent_pos}, 
-                                        waitAgents)
+                                        )
             prevMoves[a_ID] = move
             allPrevMoves[a_ID].append(move)
             if move == 'n':
