@@ -949,7 +949,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
 
     if '3' in verbose or verbose == '-1' or 'c' in verbose:
         print(ties)
-        print("Move choice: ", ret)
+        print("Move choic: ", ret)
         print()
     return ret, minCost
 
