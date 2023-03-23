@@ -13,6 +13,9 @@ import threading
 import utils as ut
 from init import getParameters
 
+random.seed(6981395)
+# random.seed(12345)
+
 wait_time = 0
 
 totalCost = 0
@@ -78,6 +81,9 @@ adjList = out['adjList']
 vertices = out['verts']
 agentVertices = out['agnt_verts']
 taskVertices = out['task_verts']
+
+for vertex in vertices:
+    assert (vertex,vertex) in adjList
 ## truncate task list to accomodate lesser number of tasks
 assert len(taskVertices) >= numTasks
 if len(taskVertices) != numTasks:
@@ -770,6 +776,13 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
     return ret,minCost
 
 def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
+
+    for vertex in networkVertices:
+        try:
+            assert (vertex, vertex) in networkEdges
+        except AssertionError:
+            networkEdges.append((vertex,vertex))
+
     currentPos = networkAgents.copy()
     currentTasks = taskPos.copy()
 
@@ -780,13 +793,14 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     prevCost = 0
 
     agent_ID = list(agent.keys())[0]
+    # print("Cluster ID: ", agents[agent_ID-1].clusterID)
     agent_pos = agent[agent_ID]
 
     for e in networkEdges:
         assert e[0] in networkVertices
         assert e[1] in networkVertices
         if e[0]==agent_pos:
-            if '3' in verbose or verbose == '-1':
+            if '3' in verbose or verbose == '-1' or 'c' in verbose:
                 print("EOI: ", e)
             tempCurrentTasks = currentTasks.copy()
             tempPositions = currentPos.copy()
@@ -799,7 +813,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             tempPositions[agent_ID] = e[1]
             if tempPositions[agent_ID] in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent_ID])
-            if '3' in verbose or verbose == '-1':
+            if '3' in verbose or verbose == '-1' or 'c' in verbose:
                 print("Task List: ", tempCurrentTasks)
 
             while len(tempCurrentTasks) > 0:
@@ -843,6 +857,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
 
     assert bestMove != None     ## should at least wait... 
 
+    print("Qfactors: ", Qfactors)
     minQ = float('inf')
     for factor in Qfactors:
         if factor[1] < minQ:
@@ -867,7 +882,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             ties.append(factor)
 
     assert len(ties) >= 1 ## some move must get finite cost
-    if '3' in verbose or verbose == '-1':
+    if '3' in verbose or verbose == '-1' or 'c' in verbose:
         print(agent_ID, agents[agent_ID-1].posX, agents[agent_ID-1].posY
             , ties, waitAgents)
 
@@ -888,10 +903,38 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     otherwise pick the last move in the ties list. 
 
     """
-    for factor in ties:
-        bestMove = factor[0]
-        if factor[0] == agent_pos:
-            break
+
+    """
+    TO-DO: 
+    --------------------------- 
+    
+    Use Euclidean distance to closest task and choose action
+    that makes progress towards this task. 
+
+    """
+    if len(ties) == 1:
+        bestMove = ties[0][0]
+    else:
+        found_wait = False
+        for factor in ties:
+            bestMove = factor[0]
+            if factor[0] == agent_pos:
+                found_wait = True
+                break
+        if not found_wait:
+            ## Find the nearest task
+            _, path = ut.bfsNearestTask(networkVertices, networkEdges,
+                                        agent_pos, taskPos)
+            assert path[-1] in taskPos
+            nearestTask = path[-1]
+            euclidean = float('inf')
+            for factor in ties:
+                ## find factor that moves towards task
+                r2_dist = np.sqrt((agent_pos[0]-nearestTask[0])**2 + 
+                                    (agent_pos[1]-nearestTask[1])**2)
+                if r2_dist < euclidean:
+                    euclidean = r2_dist
+                    bestMove = factor[0]
 
     if bestMove == (agent_pos[0]+1,agent_pos[1]):
         ret = 'e'
@@ -904,7 +947,8 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     elif bestMove == agent_pos:
         ret = 'q'
 
-    if '3' in verbose or verbose == '-1':
+    if '3' in verbose or verbose == '-1' or 'c' in verbose:
+        print(ties)
         print("Move choice: ", ret)
         print()
     return ret, minCost
@@ -1670,7 +1714,7 @@ def main():
                         print(len(taskVertices), totalCost)
                     if 't' in verbose or verbose == '-1':
                         print("Remaining Tasks: ", len(taskVertices))
-                    if len(taskVertices) == 0:
+                    if len(taskVertices) < COMPLETION_PARAM*numTasks:
                         break
                     for a in agents:
                         if a.exp_dist_remaining != 0:
