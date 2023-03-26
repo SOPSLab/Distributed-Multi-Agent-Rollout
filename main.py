@@ -21,7 +21,8 @@ totalCost = 0
 padding = 20
 
 rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
-seed, collisions, exp_strat, only_base_policy, verbose, depots = getParameters()
+seed, collisions, exp_strat, only_base_policy, verbose, depots, run_num \
+ = getParameters()
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
@@ -1772,7 +1773,10 @@ def main():
          f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
     df = df.append(new_data, ignore_index=True)
 
-    filename = "./results/" + str(rows) + "_" + "k_" + str(k) + "_" + "psi_" + str(psi) + "_seed_" + str(seed) + "_" + str(centralized) + "_" + str(exp_strat) + "_" + str(only_base_policy) + ".xlsx"
+    filename = "./results/" + str(rows) + "_" + "k_" + str(k) + "_" + "psi_" \
+    + str(psi) + "_seed_" + str(seed) + "_" + str(centralized) + "_" + \
+    str(exp_strat) + "_" + str(only_base_policy) + "_" + str(depots) + \
+    "_" + str(run_num) + ".xlsx"
 
     if os.path.exists(filename) == False:
         with pd.ExcelWriter(filename, mode="w") as writer:
