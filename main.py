@@ -1768,8 +1768,20 @@ def main():
     new_data['Total Time (s)'] = str(totalTime)
     if verbose == '-1':
         print(new_data)
-    print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
-     f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
+        print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
+         f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
+    df = df.append(new_data, ignore_index=True)
+
+    filename = "./results/" + str(rows) + "_" + "k_" + str(k) + "_" + "psi_" + str(psi) + "_seed_" + str(seed) + "_" + str(centralized) + "_" + str(exp_strat) + "_" + str(only_base_policy) + ".xlsx"
+
+    if os.path.exists(filename) == False:
+        with pd.ExcelWriter(filename, mode="w") as writer:
+            df.to_excel(writer, index=False)
+            if verbose == '-1':
+                print("Creating file: ", filename)
+    else:
+        if verbose == '-1':
+            print("File already exists... ")
 
 #Driver
 def start():
