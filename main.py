@@ -1164,6 +1164,7 @@ def main():
         print("Done. ")
         new_data['# of Exploration Steps'] = str(0)
         new_data['Wait Cost'] = str(waitCost)
+        cluster_count = 0.0
         if visualizer:
             quitButton.invoke()
 
@@ -1175,6 +1176,7 @@ def main():
             rounds = 0
             COMPLETION_PARAM = 0.1
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
+            cluster_count = 0.0
             while len(taskVertices) > target_completion:
                 time.sleep(wait_time)
 
@@ -1498,6 +1500,13 @@ def main():
                         print()
                     print()
 
+                unique_clusters = set()
+                for a in agents:
+                    if a.parent == None and len(a.clusterID) != 0:
+                        unique_clusters.add(a.clusterID[0])
+                cluster_count = ((cluster_count*(rounds-1))+ \
+                                len(unique_clusters))/rounds
+
                 """
                 ---------------------------- LMA ----------------------------
                 """
@@ -1767,6 +1776,7 @@ def main():
 
     new_data['Total Cost'] = str(totalCost)
     new_data['Total Time (s)'] = str(totalTime)
+    new_data['Average Cluster Count'] = str(cluster_count)
     if verbose == '-1':
         print(new_data)
         print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \

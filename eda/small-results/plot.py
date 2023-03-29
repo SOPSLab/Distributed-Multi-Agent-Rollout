@@ -38,35 +38,27 @@ def get_data(size, k, only_base_pi, depot):
             np.mean(wait_moves), \
             np.mean(exploration_moves)
 
-bp_dmar_10 = plt.figure()
-bp_dmar_20 = plt.figure()
-bp_dmar_30 = plt.figure()
-bp_dmar_40 = plt.figure()
-
 for size in SIZES:
     plt.figure()
     dmar_costs = []
     bp_costs = []
+    low_dmar_CIs, high_dmar_CIs = [], []
+    low_bp_CIs, high_bp_CIs = [], []
     for k in K_s:
-        cf_is, dmar_cost, _, _ = get_data(size,k,False,False)
-        cf_is, bp_cost, _, _ = get_data(size,k,True,False)
+        dmar_CI, dmar_cost, _, _ = get_data(size,k,False,False)
+        bp_CI, bp_cost, _, _ = get_data(size,k,True,False)
         dmar_costs.append(dmar_cost)
         bp_costs.append(bp_cost)
+        low_dmar_CIs.append(dmar_CI[0])
+        high_dmar_CIs.append(dmar_CI[1])
+        low_bp_CIs.append(bp_CI[0])
+        high_bp_CIs.append(bp_CI[1])
     print(dmar_costs, bp_costs)
+    plt.fill_between(K_s, low_dmar_CIs, high_dmar_CIs, color='b', alpha=0.1)
+    plt.fill_between(K_s, low_bp_CIs, high_bp_CIs, color='r', alpha=0.1)
     plt.plot(K_s,dmar_costs,label="DMAR")
     plt.plot(K_s,bp_costs,label="BP")
     plt.title(f"BP v/s DMAR for {size}x{size} grid")
     plt.legend()
     plt.xticks(ticks=K_s)
     plt.savefig(f"{size}-BP_vs_DMAR.png")
-print(get_data(40,3,True,False))
-print(get_data(40,3,False,False))
-
-print(get_data(40,6,True,False))
-print(get_data(40,6,False,False))
-
-print(get_data(10,2,True,False))
-print(get_data(10,2,False,False))
-
-print(get_data(10,6,True,False))
-print(get_data(10,6,False,False))
