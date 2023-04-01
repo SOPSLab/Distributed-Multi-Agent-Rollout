@@ -13,7 +13,7 @@ import threading
 import utils as ut
 from init import getParameters
 
-# random.seed(12345)
+random.seed(9012)
 
 wait_time = 0
 
@@ -23,6 +23,28 @@ padding = 20
 rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
 seed, collisions, exp_strat, only_base_policy, verbose, depots, run_num \
  = getParameters()
+
+# if depots: 
+#     if run_num == 1:
+#         random.seed(1234)
+#     elif run_num == 2:
+#         random.seed(5678)
+#     elif run_num == 3:
+#         random.seed(9012)
+#     elif run_num == 4:
+#         random.seed(3456)
+#     elif run_num == 5:
+#         random.seed(7890)
+#     elif run_num == 6:
+#         random.seed(666)
+#     elif run_num == 7:
+#         random.seed(777)
+#     elif run_num == 8:
+#         random.seed(3468)
+#     elif run_num == 9:
+#         random.seed(43623)
+#     elif run_num == 10:
+#         random.seed(23956)
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
@@ -1704,8 +1726,9 @@ def main():
                 ## loose upper bound... 
                 # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                 num_iterations = (2**psi)*k
+                tempTasks = taskVertices.copy()
                 for i in range(num_iterations):
-                    if '3' in verbose or verbose == '-1':
+                    if 'r' in verbose or '3' in verbose or verbose == '-1':
                         print("=======Round: {}/{}".format(i, num_iterations))
                         print(len(taskVertices), totalCost)
                     if 't' in verbose or verbose == '-1':
@@ -1719,7 +1742,12 @@ def main():
                     for a in agents:
                         if len(a.clusterID)==0:
                             a.updateView()
-                            if len(a.viewTasks) == 0:
+                            found = False
+                            for vertex in a.viewVertices:
+                                if vertex in tempTasks:
+                                    found = True
+                                    break
+                            if found == False:
                                 a.dir=getExplorationMove(a, lookupTable)
                                 if a.dir != 'q':
                                     if verbose == 'x':
@@ -1743,6 +1771,7 @@ def main():
                                 waitCost += 1
                     stateUpdate()
                     time.sleep(wait_time)
+                    print()
 
                 for a in agents:
                     a.deallocate()
@@ -1777,7 +1806,7 @@ def main():
     new_data['Total Cost'] = str(totalCost)
     new_data['Total Time (s)'] = str(totalTime)
     new_data['Average Cluster Count'] = str(cluster_count)
-    if verbose == '-1':
+    if 'r' in verbose or verbose == '-1':
         print(new_data)
         print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
          f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
