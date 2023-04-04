@@ -13,9 +13,9 @@ import threading
 import utils as ut
 from init import getParameters
 
-random.seed(9012)
+# random.seed(9012)
 
-wait_time = 0
+wait_time = 1
 
 totalCost = 0
 padding = 20
@@ -24,27 +24,27 @@ rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
 seed, collisions, exp_strat, only_base_policy, verbose, depots, run_num \
  = getParameters()
 
-# if depots: 
-#     if run_num == 1:
-#         random.seed(1234)
-#     elif run_num == 2:
-#         random.seed(5678)
-#     elif run_num == 3:
-#         random.seed(9012)
-#     elif run_num == 4:
-#         random.seed(3456)
-#     elif run_num == 5:
-#         random.seed(7890)
-#     elif run_num == 6:
-#         random.seed(666)
-#     elif run_num == 7:
-#         random.seed(777)
-#     elif run_num == 8:
-#         random.seed(3468)
-#     elif run_num == 9:
-#         random.seed(43623)
-#     elif run_num == 10:
-#         random.seed(23956)
+if depots: 
+    if run_num == 1:
+        random.seed(1234)
+    elif run_num == 2:
+        random.seed(5678)
+    elif run_num == 3:
+        random.seed(9012)
+    elif run_num == 4:
+        random.seed(3456)
+    elif run_num == 5:
+        random.seed(7890)
+    elif run_num == 6:
+        random.seed(666)
+    elif run_num == 7:
+        random.seed(777)
+    elif run_num == 8:
+        random.seed(3468)
+    elif run_num == 9:
+        random.seed(43623)
+    elif run_num == 10:
+        random.seed(23956)
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
