@@ -207,6 +207,8 @@ def getParameters():
     parser.add_argument('--exp', required=True, type=int)
     parser.add_argument('--only_base_pi', required=False, default=False, 
                             action='store_true')
+    parser.add_argument('--pure_greedy', required=False, default=False,
+                            action='store_true')
     parser.add_argument('--verbose', required=False, default=0,
                             type=str)
     parser.add_argument('--depot', required=False, default=False,
@@ -228,6 +230,7 @@ def getParameters():
     collisions = (args.no_colis)
     exp_strat = args.exp
     only_base_policy = args.only_base_pi
+    pure_greedy = args.pure_greedy
     verbose = (str)(args.verbose)
     depots = args.depot
     run_num = (int)(args.run_num)
@@ -240,10 +243,14 @@ def getParameters():
     #print("Centralized")
     # else:
     #print("Decentralized")
+    if pure_greedy:
+        only_base_policy = False
+        depots = False
+        assert not centralized
 
     return rows, cols, numAgents, numTasks, k, psi, centralized, \
             visualizer, wall_prob, seed, collisions, exp_strat, \
-            only_base_policy, verbose, depots, run_num
+            only_base_policy, pure_greedy, verbose, depots, run_num
 
 
 
