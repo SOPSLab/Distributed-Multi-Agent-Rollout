@@ -1,10 +1,13 @@
-import sys
+import sys, os
 from tkinter import *
 from PIL import ImageTk,Image
 import numpy as np
 import pandas as pd
 import random
 import time
+import itertools
+import copy
+import openpyxl
 import threading
 
 import utils as ut
@@ -33,7 +36,6 @@ if visualizer:
     root.title("RL Demo")
 
 gridLabels=[]
-holeProb=0.25
 pauseFlag=False
 memSize=10
 
