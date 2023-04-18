@@ -654,6 +654,24 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
                 currentPos[a]=(currentPos[a][0],currentPos[a][1])
             if currentPos[a] in currentTasks:
                 currentTasks.remove(currentPos[a])
+        else:
+            if a != agent:
+                nearest = float('inf')
+                newPos = None
+                for task in currentTasks:
+                    dist,path = lookupTable[str((a.posX,a.posY))][str(task)]
+                    print(dist, dist < nearest)
+                    if dist != None and dist < nearest:
+                        print(dist, nearest)
+                        nearest = dist
+                        newPos = path
+                        print(dist, nearest)
+                assert newPos != None
+                currentPos[a] = newPos
+                if currentPos[a] in currentTasks:
+                    currentTasks.remove(currentPos[a])
+        if len(currentTasks) == 0:
+            break
 
     if len(currentTasks)==0:
         return 'q', 0
@@ -665,11 +683,8 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
 
     for e in networkEdges:
         if e[0]==(agent.posX,agent.posY):
-            # #print('flag')
             tempCurrentTasks=currentTasks.copy()
-            ##print(tempCurrentTasks)
             tempPositions=currentPos.copy()
-            # #print(tempPositions)
             if e[1] != e[0]:
                 cost=prevCost+1
             else:
@@ -679,50 +694,35 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
             #print("lookahead edge: ", e)
             if tempPositions[agent]in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent])
-                #bestMove=e[1]
-                #break
-            # #print(tempCurrentTasks)
             rounds = 0
             while len(tempCurrentTasks)>0:
-                if rounds > len(networkVertices) + len(networkEdges):
-                    cost += 10_000
-                    break
                 # #print('flag2')
                 # print("POS: ", tempPositions, tempCurrentTasks, cost)
                 for a in agents:
-                    if ((a.ID < agent.ID) and prevMoves[a] != 'q') or (a.ID >= agent.ID):
-                        shortestDist=float('inf')
-                        bestNewPos=None
-                        #assert len(tempCurrentTasks)>0
-                        #print("======== Agent a: {} ========".format((a.posX, a.posY)))
-                        for t in tempCurrentTasks:
-                            # #print("MR: ",tempPositions[agent], tempPositions[a], t)
-                            # dist,path=bfShortestPath(networkVertices,networkEdges,tempPositions[a],t)
-                            try:
-                                #print("PRE:", tempPositions, a.posX, a.posY)
-                                dist,path = (lookupTable[str(tempPositions[a])][str(t)])
-                            except (AssertionError, KeyError):
-                                continue
-                            #dist, path = lookupTable[str(tempPositions[a])][str(t)]
+                    shortestDist=float('inf')
+                    bestNewPos=None
+                    #assert len(tempCurrentTasks)>0
+                    #print("======== Agent a: {} ========".format((a.posX, a.posY)))
+                    for t in tempCurrentTasks:
+                        try:
+                            #print("PRE:", tempPositions, a.posX, a.posY)
+                            dist,path = (lookupTable[str(tempPositions[a])][str(t)])
+                        except (AssertionError, KeyError):
+                            continue
+                        #dist, path = lookupTable[str(tempPositions[a])][str(t)]
 
-                            # #print("\tPath: {}; Dist: {}".format(path, dist))
-                            if dist<shortestDist:
-                                shortestDist=dist
-                                bestNewPos=path
-                        if bestNewPos != None:
-                            if (e[1] == (agent.posX, agent.posY)) and (a.ID == agent.ID):
-                                ## if this is wait move, main agent must become inactive for
-                                ## rest of cost-to-go computation
-                                pass
-                            else:
-                                tempPositions[a]=bestNewPos
-                        if tempPositions[a] in tempCurrentTasks:
-                            tempCurrentTasks.remove(tempPositions[a])
-                        if e[1] != (agent.posX, agent.posY) or (a.posX!=agent.posX) or (a.ID != agent.ID):
-                            cost += 1
-                        rounds += 1
-                        if len(tempCurrentTasks)==0:
-                            break
+                        # #print("\tPath: {}; Dist: {}".format(path, dist))
+                        if dist<shortestDist:
+                            shortestDist=dist
+                            bestNewPos=path
+                    if bestNewPos != None:
+                        tempPositions[a]=bestNewPos
+                        cost += 1
+                    if tempPositions[a] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a])
+                    rounds += 1
+                    if len(tempCurrentTasks)==0:
+                        break
             #print("resulting cost for action {}: {} ".format((e[0],e[1]), cost))
             #print(e[1], cost)
             if cost<minCost:
@@ -1187,6 +1187,7 @@ def main():
         new_data['# of Exploration Steps'] = str(0)
         new_data['Wait Cost'] = str(waitCost)
         cluster_count = 0.0
+        explore_steps = 0
         if visualizer:
             quitButton.invoke()
 
