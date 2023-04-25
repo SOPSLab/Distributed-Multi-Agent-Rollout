@@ -1,35 +1,59 @@
-import sys, os
+import sys
 from tkinter import *
 from PIL import ImageTk,Image
 import numpy as np
 import pandas as pd
 import random
 import time
-import itertools
-import copy
-import openpyxl
 import threading
+import rps.robotarium as robotarium
+from rps.utilities.transformations import *
+from rps.utilities.barrier_certificates import *
+from rps.utilities.misc import *
+from rps.utilities.controllers import *
+from rps.utilities.graph import *
 
-import utils as ut
-from init import getParameters
+from robotarium_init import *
 
 random.seed(6981395)
 # random.seed(12345)
 
+# Direction radians
+NORTH = 1.5708
+SOUTH = 4.71239
+WEST = 3.1419
+EAST = 0.0000
+
+BASE_DIR = [0, 1]
+
 wait_time = 0
 
 totalCost = 0
-padding = 20
 
-rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
-seed, collisions, exp_strat, only_base_policy, verbose, depots = getParameters()
+# rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
+# seed, collisions, exp_strat, only_base_policy, verbose, depots = getParameters()
+
+A, numTasks, k, psi, wall_prob, seed, only_base_policy = getParameters()
+
+centralized = False
+visualizer = False
+collisions = False
+exp_strat = 0
+rows = 9
+cols = 9
+size = 9
+step = 0.2
+verbose = '0'
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
             '# of Agents': str(A), '# of Tasks': str(numTasks), 'k': str(k),
-            'psi': str(psi), 'Only Base Policy': str(only_base_policy),
-            'Depots': str(depots)}
+            'psi': str(psi), 'Only Base Policy': str(only_base_policy)}
 
+
+
+
+"""
 if visualizer:
     root = Tk()
     root.resizable(height=None, width=None)
@@ -41,13 +65,49 @@ memSize=10
 
 agentImages=[]
 edgeList=[]
+"""
 vertices=[]
 global colors
 colors=[]
 for i in range(100):
     colors+=[1,2,3,4,5,6,7,8,9,10,12,13,14,15,16,17,18,
                 19,20,21,22,23,24,25,26,27,28,29,30,31]
+colorIndex = ['#FDD835',
+ '#E53935',
+ '#03A9F4',
+ '#78909C',
+ '#8BC34A',
+ '#7E57C2',
+ '#26C6DA',
+ '#827717',
+ '#9C27B0',
+ '#8D6E63',
+ 'none',
+ '#FDD835',
+ '#E53935',
+ '#03A9F4',
+ '#78909C',
+ '#8BC34A',
+ '#7E57C2',
+ '#26C6DA',
+ '#827717',
+ '#9C27B0',
+ '#8D6E63',
+ '#FDD835',
+ '#E53935',
+ '#03A9F4',
+ '#78909C',
+ '#8BC34A',
+ '#7E57C2',
+ '#26C6DA',
+ '#827717',
+ '#9C27B0',
+ '#8D6E63',
+ '#FDD835']
 
+marker_shapes = ['none','s','o','P', 'H', 'X', 'D','*', '^','p', '1','s','o','*', '^','p','P', 'H', 'X', 'D', '1','s','o','*', '^','p','P', 'H', 'X', 'D', '1',]
+
+"""
 if visualizer:
     #agent images
     for i in range(31):
@@ -68,18 +128,39 @@ if visualizer:
         for j in range(cols):
             row1.append(0)
         gridLabels.append(row1)
+"""
 
 ## loop till you get a valid grid...
 print("Initializing... ")
-out, offlineTrainRes = ut.load_instance(rows, seed)
-if out == None:
-    sys.exit(1)
+# out, offlineTrainRes = ut.load_instance(rows, seed)
+# if out == None:
+#     sys.exit(1)
+
+## Uncomment and use it directly from init
+out = init_valid_grid(A, numTasks, wall_prob=wall_prob,
+                      seed=seed, colis=collisions)
 
 gridGraph = out['gridGraph']
 adjList = out['adjList']
 vertices = out['verts']
 agentVertices = out['agnt_verts']
 taskVertices = out['task_verts']
+obstacles = out["obs_verts"]
+edgeList = out["adjList"]
+
+obs_dir = out["obs_dir"]
+
+## Uncomment below for better graphics in robotarium
+# x_obs = [-1.0, 1]
+# for x in x_obs:
+#     for y in np.arange(1.0, -1.2, -0.2):
+#         obstacles.append((x,round(y,1)))
+#         obs_dir.append(1)
+
+# y_obs = [-1.0, 1]
+# for y in y_obs:
+#     for x in np.arange(0.8, -1.0, -0.2):
+#         obstacles.append((round(x,1),y))
 
 for vertex in vertices:
     assert (vertex,vertex) in adjList
@@ -101,6 +182,7 @@ for i in range(len(taskVertices)):
 N = len(vertices)
 N = 2**(psi+1)
 
+"""
 if visualizer:
     for i in range(rows):
         for j in range(cols):
@@ -128,7 +210,9 @@ if visualizer:
             image=taskList[i],borderwidth=6, padx=6,pady=4.495,relief="solid")
         gridLabels[taskVertices[i][0]][taskVertices[i][1]].grid(
             row=taskVertices[i][0],column=taskVertices[i][1])
+"""
 
+"""
 def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
     gridLabels[x][y].grid_forget()
@@ -146,15 +230,170 @@ def changeCell(x,y,cellType,agentNum):
         gridLabels[x][y]=Label(root, text="     ", borderwidth=6, 
             padx=padding,pady=padding,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
+"""
 
+def getTasksWithinRadius(agent_pos, taskVertices, radius):
+    visible_tasks = []
+    for t in taskVertices:
+        if np.linalg.norm(np.asarray(t)-agent_pos)<=radius:
+            visible_tasks.append(t)
+    return visible_tasks
+
+def bfs(vertices, edges, root, goal):
+    Q = []
+    labels = {}
+    for v in vertices:
+        if v[0] == 0 and v[1] == 0:
+            tup = (0.0, 0.0)
+            labels[str(tup)] = False
+        elif v[0] == 0:
+            tup = (0.0, v[1])
+            labels[str(tup)] = False
+        elif v[1] == 0:
+            tup = (v[0], 0.0)
+            labels[str(tup)] = False
+        else:
+            labels[str(v)] = False
+    Q.append(root)
+    labels[str(root)] = True
+    while (len(Q)) > 0:
+        v = Q.pop(0)
+        if v == goal:
+            return True
+        for e in edges:
+            if e[0] == v:
+                if e[1][0] == 0 and e[1][1] == 0:
+                    tup = (0.0, 0.0)
+                elif e[1][0] == 0:
+                    tup = (0.0, e[1][1])
+                elif e[1][1] == 0:
+                    tup = (e[1][0], 0.0)
+                else:
+                    tup = (e[1][0], e[1][1])
+                if labels[str(tup)] == False:
+                    labels[str(tup)] = True
+                    Q.append(tup)
+    return False
+
+def bfsNearestTask(networkVertices, networkEdges, source, taskVertices):
+    Q = []
+    labels = {}
+    prev = {}
+    prev[str(source)] = None
+    dist = -1
+
+    for v in networkVertices:
+        if v[0] == 0 and v[1] == 0:
+            tup = (0.0, 0.0)
+            labels[str(tup)] = False
+        elif v[0] == 0:
+            tup = (0.0, v[1])
+            labels[str(tup)] = False
+        elif v[1] == 0:
+            tup = (v[0], 0.0)
+            labels[str(tup)] = False
+        else:
+            labels[str(v)] = False
+
+    Q.append(source)
+    labels[str(source)] = True
+    while(len(Q)) > 0:
+        v = Q.pop(0)
+
+        for edge in networkEdges:
+            if edge[0] == v:
+                if edge[1][0] == 0 and edge[1][1] == 0:
+                    tup = (0.0, 0.0)
+                elif edge[1][0] == 0:
+                    tup = (0.0, edge[1][1])
+                elif edge[1][1] == 0:
+                    tup = (edge[1][0], 0.0)
+                else:
+                    tup = (edge[1][0], edge[1][1])
+                if labels[str(tup)] == False:
+                    labels[str(tup)] = True
+                    prev[str(tup)] = v
+                    Q.append(tup)
+                    if tup in taskVertices:
+                        t = tup
+                        if prev[str(t)] != None or t==source:
+                            path = []
+                            while t != None:
+                                path.append(t)
+                                t = prev[str(t)]
+                                dist += 1
+                        return dist, list(reversed(path))
+
+    return None,None
+
+def dirShortestPath(networkVertices,networkEdges,source,target):
+    Q=[]
+    dist={}
+    prev={}
+
+    assert target in networkVertices
+    assert source in networkVertices
+
+    for v in networkVertices:
+        if v[0] == 0 and v[1] == 0:
+            tup = (0.0, 0.0)
+        elif v[0] == 0:
+            tup = (0.0, v[1])
+        elif v[1] == 0:
+            tup = (v[0], 0.0)
+        else:
+            tup = v
+        dist[str(tup)]= 9999999999
+        prev[str(tup)]=None
+        Q.append(tup)
+    dist[str(source)]=0
+    while len(Q)>0:
+        uNum=9999999999
+        u=None
+        for q in Q:
+            if dist[str(q)]<=uNum:
+                u=q
+                uNum=dist[str(q)]
+        Q.remove(u)
+        if u == target:
+            S=[]
+            if target[0] == 0 and target[1] == 0:
+                t = (0.0, 0.0)
+            elif target[0] == 0:
+                t = (0.0, target[1])
+            elif target[1] == 0:
+                t = (target[0], 0.0)
+            else:
+                t = target
+            if prev[str(t)] != None or t==source:
+                while t != None:
+                    S.append(t)
+                    t=prev[str(t)]
+                return dist[str(t)],list(reversed(S))
+        for e in networkEdges:
+            if e[0]==u:
+                if e[1][0] == 0 and e[1][1] == 0:
+                    tup = (0.0, 0.0)
+                elif e[1][0] == 0:
+                    tup = (0.0, e[1][1])
+                elif e[1][1] == 0:
+                    tup = (e[1][0], 0.0)
+                else:
+                    tup = (e[1][0], e[1][1])
+                alt = dist[str(u)]+1
+                if alt < dist[str(tup)]:
+                    dist[str(tup)]=alt
+                    prev[str(tup)]=u
+    return None, None
 class Agent:
-    def __init__(self,x,y,ID,color=1):
+    def __init__(self,x,y,orient,ID,color=1):
         self.posX=x
         self.posY=y
+        self.orientation = orient
         self.prev_move = None
         self.cost=0
-        if visualizer:
-            changeCell(x,y,'agent',color)
+        # if visualizer:
+        #     changeCell(x,y,'agent',color)
         self.color=color
         self.ID=ID
 
@@ -165,7 +404,7 @@ class Agent:
         self.cost_prime = 0
         self.color_prime = color
 
-        self.gui_split = False
+        # self.gui_split = False
 
         self.exploring = False
         self.exp_dir = ''
@@ -176,8 +415,8 @@ class Agent:
     def resetColor(self):
         self.color=11
         self.color_prime=11
-        if visualizer:
-            changeCell(self.posX,self.posY,'agent',self.color)
+        # if visualizer:
+        #     changeCell(self.posX,self.posY,'agent',self.color)
         sys.stdout.flush()
 
     def deallocate(self):
@@ -254,6 +493,9 @@ class Agent:
 
     def setYPos(self,y):
         self.posY=y
+    
+    def setOrientation(self, orient):
+        self.orientation = orient
 
     def getCostIncurred(self):
         return self.cost
@@ -264,171 +506,222 @@ class Agent:
     def move(self,dir):
         self.dir=dir
 
-    def updateView(self):
-        self.viewEdges=set()
-        self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY)))
-        self.viewVertices=set([(self.posX,self.posY)])
-        self.viewAgents=set()
-        self.viewTasks=set()
+    def getColor(self):
+        return self.color
+    
+    def getCluster(self):
+        return self.clusterID
 
-        self.viewEdges_prime=set()
-        self.viewEdges_prime.add(((self.posX,self.posY),(self.posX,self.posY)))
-        self.viewVertices_prime=set([(self.posX,self.posY)])
-        self.viewAgents_prime=set()
-        self.viewTasks_prime=set()
-        #Create Internal Representation
-        for i in range(1,k+1):
-            if (self.posX+i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX+i,self.posY)))
-                #self.viewEdges.add(((self.posX+i,self.posY),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX+i,self.posY))
-                self.viewVertices_prime.add((self.posX+i,self.posY))
-                if (self.posX+i,self.posY) in taskVertices:
-                    self.viewTasks.add((self.posX+i,self.posY))
-                    self.viewTasks_prime.add((self.posX+i,self.posY))
-                for j in  range(1,k-i+1):
-                    if (self.posX+i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY+j-1),(self.posX+i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY+j),(self.posX+i,self.posY+j-1)))
-                        self.viewVertices.add((self.posX+i,self.posY+j))
-                        self.viewVertices_prime.add((self.posX+i,self.posY+j))
-                        if (self.posX+i,self.posY+j) in taskVertices:
-                            self.viewTasks.add((self.posX+i,self.posY+j))
-                            self.viewTasks_prime.add((self.posX+i,self.posY+j))
-                    if (self.posX+i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY-j+1),(self.posX+i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY-j),(self.posX+i,self.posY-j+1)))
-                        self.viewVertices.add((self.posX+i,self.posY-j))
-                        self.viewVertices_prime.add((self.posX+i,self.posY-j))
-                        if (self.posX+i,self.posY-j) in taskVertices:
-                            self.viewTasks.add((self.posX+i,self.posY-j))
-                            self.viewTasks_prime.add((self.posX+i,self.posY-j))
-            if (self.posX-i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX-i,self.posY)))
-                #self.viewEdges.add(((self.posX-i,self.posY),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX-i,self.posY))
-                self.viewVertices_prime.add((self.posX-i,self.posY))
-                if (self.posX-i,self.posY) in taskVertices:
-                    self.viewTasks.add((self.posX-i,self.posY))
-                    self.viewTasks_prime.add((self.posX-i,self.posY))
-                for j in  range(1,k-i+1):
-                    if (self.posX-i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY+j-1),(self.posX-i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY+j),(self.posX-i,self.posY+j-1)))
-                        self.viewVertices.add((self.posX-i,self.posY+j))
-                        self.viewVertices_prime.add((self.posX-i,self.posY+j))
-                        if (self.posX-i,self.posY+j) in taskVertices:
-                            self.viewTasks.add((self.posX-i,self.posY+j))
-                            self.viewTasks_prime.add((self.posX-i,self.posY+j))
+    def updateView(self, poses):
+        self.viewEdges = set()
+        self.viewEdges.add(((self.posX, self.posY), (self.posX, self.posY)))
+        self.viewVertices = set([(self.posX, self.posY)])
+        self.viewAgents = set()
+        self.viewTasks = set()
 
-                    if (self.posX-i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY-j+1),(self.posX-i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY-j),(self.posX-i,self.posY-j+1)))
-                        self.viewVertices.add((self.posX-i,self.posY-j))
-                        self.viewVertices_prime.add((self.posX-i,self.posY-j))
-                        if (self.posX-i,self.posY-j) in taskVertices:
-                            self.viewTasks.add((self.posX-i,self.posY-j))
-                            self.viewTasks_prime.add((self.posX-i,self.posY-j))
+        self.viewEdges_prime = set()
+        self.viewEdges_prime.add(
+            ((self.posX, self.posY), (self.posX, self.posY)))
+        self.viewVertices_prime = set([(self.posX, self.posY)])
+        self.viewAgents_prime = set()
+        self.viewTasks_prime = set()
+        # Create Internal Representation
+        # k = hops
+        # for each hop
+        agent_pos = poses[:2,self.ID-1]
 
+        visible_tasks = getTasksWithinRadius(agent_pos, taskVertices, step*k+(step*0.25))
 
-            if (self.posX,self.posY+i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY+i)))
-                # self.viewEdges.add(((self.posX,self.posY+i),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX,self.posY+i))
-                self.viewVertices_prime.add((self.posX,self.posY+i))
-                if (self.posX,self.posY+i) in taskVertices:
-                    self.viewTasks.add((self.posX,self.posY+i))
-                    self.viewTasks_prime.add((self.posX,self.posY+i))
-                for j in  range(1,k-i+1):
-                    if (self.posX+j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX+j-1,self.posY+i),(self.posX+j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX+j,self.posY+i),(self.posX+j-1,self.posY+i)))
-                        self.viewVertices.add((self.posX+j,self.posY+i))
-                        self.viewVertices_prime.add((self.posX+j,self.posY+i))
-                        if (self.posX+j,self.posY+i) in taskVertices:
-                            self.viewTasks.add((self.posX+j,self.posY+i))
-                            self.viewTasks_prime.add((self.posX+j,self.posY+i))
-                    if (self.posX-j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY+i),(self.posX-j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY+i)))
-                        self.viewVertices.add((self.posX-j,self.posY+i))
-                        self.viewVertices_prime.add((self.posX-j,self.posY+i))
-                        if (self.posX-j,self.posY+i) in taskVertices:
-                            self.viewTasks.add((self.posX-j,self.posY+i))
-                            self.viewTasks_prime.add((self.posX-j,self.posY+i))
+        for i in range(1, k+1):
+            # One hop in each direction
+            up = round(self.posY+i*step, 1)
+            down = round(self.posY-i*step, 1)
+            left = round(self.posX-i*step, 1)
+            right = round(self.posX+i*step, 1)
+            # check if it exist in the grid bounds
+            if (right, self.posY) in vertices:
+                # self.viewEdges.add(((self.posX,self.posY),(self.posX+i,self.posY)))
+                # self.viewEdges.add(((self.posX+i,self.posY),(self.posX,self.posY)))
+                self.viewVertices.add((right, self.posY))
+                self.viewVertices_prime.add((right, self.posY))
+                if any([np.linalg.norm(np.asarray(t)-np.asarray((right, self.posY)))<=0.1 for t in visible_tasks]):
+                    self.viewTasks.add((right, self.posY))
+                    self.viewTasks_prime.add((right, self.posY))
 
-            if (self.posX,self.posY-i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY-i)))
-                #self.viewEdges.add(((self.posX,self.posY-i),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX,self.posY-i))
-                self.viewVertices_prime.add((self.posX,self.posY-i))
-                if (self.posX,self.posY-i) in taskVertices:
-                    self.viewTasks.add((self.posX,self.posY-i))
-                    self.viewTasks_prime.add((self.posX,self.posY-i))
-                for j in  range(1,k-i+1):
-                    if (self.posX+j,self.posY-i) in vertices:
-                        # self.viewEdges.add(((self.posX+j-1,self.posY-i),(self.posX+j,self.posY-i)))
-                        # self.viewEdges.add(((self.posX+j,self.posY-i),(self.posX+j-1,self.posY-i)))
-                        self.viewVertices.add((self.posX+j,self.posY-i))
-                        self.viewVertices_prime.add((self.posX+j,self.posY-i))
-                        if (self.posX+j,self.posY-i) in taskVertices:
-                            self.viewTasks.add((self.posX+j,self.posY-i))
-                            self.viewTasks_prime.add((self.posX+j,self.posY-i))
-                    if (self.posX-j,self.posY-i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY-i),(self.posX-j,self.posY-i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY-i)))
-                        self.viewVertices.add((self.posX-j,self.posY-i))
-                        self.viewVertices_prime.add((self.posX-j,self.posY-i))
-                        if (self.posX-j,self.posY-i) in taskVertices:
-                            self.viewTasks.add((self.posX-j,self.posY-i))
-                            self.viewTasks_prime.add((self.posX-j,self.posY-i))
+                # for remaining hops
+                for j in range(1, k-i+1):
+                    up_steps = round(self.posY+j*step, 1)
+                    down_steps = round(self.posY-j*step, 1)
+                    if (right, up_steps) in vertices:
+                        # self.viewEdges.add(((right,up_steps-1),(right,up_steps)))
+                        # self.viewEdges.add(((right,up_steps),(right,up_steps-1)))
+                        self.viewVertices.add((right, up_steps))
+                        self.viewVertices_prime.add((right, up_steps))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((right, up_steps)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((right, up_steps))
+                            self.viewTasks_prime.add(
+                                (right, up_steps))
+                    if (right, down_steps) in vertices:
+                        # self.viewEdges.add(((right,down_steps+1),(right,down_steps)))
+                        # self.viewEdges.add(((right,down_steps),(right,down_steps+1)))
+                        self.viewVertices.add((right, down_steps))
+                        self.viewVertices_prime.add((right, down_steps))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((right, down_steps)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((right, down_steps))
+                            self.viewTasks_prime.add(
+                                (right, down_steps))
+
+            # check if it exist in the grid bounds
+            if (left, self.posY) in vertices:
+                # self.viewEdges.add(((self.posX,self.posY),(left,self.posY)))
+                # self.viewEdges.add(((left,self.posY),(self.posX,self.posY)))
+                self.viewVertices.add((left, self.posY))
+                self.viewVertices_prime.add((left, self.posY))
+                if any([np.linalg.norm(np.asarray(t)-np.asarray((left, self.posY)))<=0.1 for t in visible_tasks]):
+                    self.viewTasks.add((left, self.posY))
+                    self.viewTasks_prime.add((left, self.posY))
+
+                for j in range(1, k-i+1):
+                    up_steps = round(self.posY+j*step, 1)
+                    down_steps = round(self.posY-j*step, 1)
+                    if (left, up_steps) in vertices:
+                        # self.viewEdges.add(((left,up_steps-1),(left,up_steps)))
+                        # self.viewEdges.add(((left,up_steps),(left,up_steps-1)))
+                        self.viewVertices.add((left, up_steps))
+                        self.viewVertices_prime.add((left, up_steps))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((left, up_steps)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((left, up_steps))
+                            self.viewTasks_prime.add(
+                                (left, up_steps))
+
+                    if (left, down_steps) in vertices:
+                        # self.viewEdges.add(((left,down_steps+1),(left,down_steps)))
+                        # self.viewEdges.add(((left,down_steps),(left,down_steps+1)))
+                        self.viewVertices.add((left, down_steps))
+                        self.viewVertices_prime.add((left, down_steps))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((left, down_steps)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((left, down_steps))
+                            self.viewTasks_prime.add(
+                                (left, down_steps))
+
+            # check if it exist in the grid bounds
+            if (self.posX, up) in vertices:
+                # self.viewEdges.add(((self.posX,self.posY),(self.posX,up)))
+                # self.viewEdges.add(((self.posX,up),(self.posX,self.posY)))
+                self.viewVertices.add((self.posX, up))
+                self.viewVertices_prime.add((self.posX, up))
+                if any([np.linalg.norm(np.asarray(t)-np.asarray((self.posX, up)))<=0.1 for t in visible_tasks]):
+                    self.viewTasks.add((self.posX, up))
+                    self.viewTasks_prime.add((self.posX, up))
+                for j in range(1, k-i+1):
+                    right_steps = round(self.posX+j*step, 1)
+                    left_steps = round(self.posX-j*step, 1)
+                    if (right_steps, up) in vertices:
+                        # self.viewEdges.add(((right_steps-1,up),(right_steps,up)))
+                        # self.viewEdges.add(((right_steps,up),(right_steps-1,up)))
+                        self.viewVertices.add((right_steps, up))
+                        self.viewVertices_prime.add((right_steps, up))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((right_steps, up)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((right_steps, up))
+                            self.viewTasks_prime.add(
+                                (right_steps, up))
+                    if (left_steps, up) in vertices:
+                        # self.viewEdges.add(((left_steps+1,up),(left_steps,up)))
+                        # self.viewEdges.add(((left_steps,self.posY+1),(left_steps+1,up)))
+                        self.viewVertices.add((left_steps, up))
+                        self.viewVertices_prime.add((left_steps, up))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((left_steps, up)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((left_steps, up))
+                            self.viewTasks_prime.add(
+                                (left_steps, up))
+
+            # check if it exist in the grid bounds
+            if (self.posX, down) in vertices:
+                # self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY-i)))
+                # self.viewEdges.add(((self.posX,self.posY-i),(self.posX,self.posY)))
+                self.viewVertices.add((self.posX, down))
+                self.viewVertices_prime.add((self.posX, down))
+                if any([np.linalg.norm(np.asarray(t)-np.asarray((self.posX, down)))<=0.1 for t in visible_tasks]):
+                    self.viewTasks.add((self.posX, down))
+                    self.viewTasks_prime.add((self.posX, down))
+                for j in range(1, k-i+1):
+                    right_steps = round(self.posX+j*step, 1)
+                    left_steps = round(self.posX-j*step, 1)
+                    if (right_steps, down) in vertices:
+                        # self.viewEdges.add(((right_steps-1,down),(right_steps,down)))
+                        # self.viewEdges.add(((right_steps,down),(right_steps-1,down)))
+                        self.viewVertices.add((right_steps, down))
+                        self.viewVertices_prime.add((right_steps, down))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((right_steps, down)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((right_steps, down))
+                            self.viewTasks_prime.add(
+                                (right_steps, down))
+                    if (left_steps, down) in vertices:
+                        # self.viewEdges.add(((left_steps+1,down),(left_steps,down)))
+                        # self.viewEdges.add(((left_steps,self.posY+1),(left_steps+1,down)))
+                        self.viewVertices.add((left_steps, down))
+                        self.viewVertices_prime.add((left_steps, down))
+                        if any([np.linalg.norm(np.asarray(t)-np.asarray((left_steps, down)))<=0.1 for t in visible_tasks]):
+                            self.viewTasks.add((left_steps, down))
+                            self.viewTasks_prime.add(
+                                (left_steps, down))
 
             for u in self.viewVertices:
-                if (u[0]+1,u[1]) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0]+1,u[1])))
-                    self.viewEdges.add(((u[0]+1,u[1]),(u[0],u[1])))
+                up_edge = round(u[1]+1*step, 1)
+                down_edge = round(u[1]-1*step, 1)
+                left_edge = round(u[0]-1*step, 1)
+                right_edge = round(u[0]+1*step, 1)
+                if (right_edge, u[1]) in self.viewVertices:
+                    self.viewEdges.add(((u[0], u[1]), (right_edge, u[1])))
+                    self.viewEdges.add(((right_edge, u[1]), (u[0], u[1])))
 
-                if (u[0]-1,u[1]) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0]-1,u[1])))
-                    self.viewEdges.add(((u[0]-1,u[1]),(u[0],u[1])))
+                if (left_edge, u[1]) in self.viewVertices:
+                    self.viewEdges.add(((u[0], u[1]), (left_edge, u[1])))
+                    self.viewEdges.add(((left_edge, u[1]), (u[0], u[1])))
 
-                if (u[0],u[1]+1) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0],u[1]+1)))
-                    self.viewEdges.add(((u[0],u[1]+1),(u[0],u[1])))
+                if (u[0], up_edge) in self.viewVertices:
+                    self.viewEdges.add(((u[0], u[1]), (u[0], up_edge)))
+                    self.viewEdges.add(((u[0], up_edge), (u[0], u[1])))
 
-                if (u[0],u[1]-1) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0],u[1]-1)))
-                    self.viewEdges.add(((u[0],u[1]-1),(u[0],u[1])))
+                if (u[0], down_edge) in self.viewVertices:
+                    self.viewEdges.add(((u[0], u[1]), (u[0], down_edge)))
+                    self.viewEdges.add(((u[0], down_edge), (u[0], u[1])))
 
             for u in self.viewVertices_prime:
-                if (u[0]+1,u[1]) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0]+1,u[1])))
-                    self.viewEdges_prime.add(((u[0]+1,u[1]),(u[0],u[1])))
+                up_edge = round(u[1]+1*step, 1)
+                down_edge = round(u[1]-1*step, 1)
+                left_edge = round(u[0]-1*step, 1)
+                right_edge = round(u[0]+1*step, 1)
+                if (right_edge, u[1]) in self.viewVertices_prime:
+                    self.viewEdges_prime.add(
+                        ((u[0], u[1]), (right_edge, u[1])))
+                    self.viewEdges_prime.add(
+                        ((right_edge, u[1]), (u[0], u[1])))
 
-                if (u[0]-1,u[1]) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0]-1,u[1])))
-                    self.viewEdges_prime.add(((u[0]-1,u[1]),(u[0],u[1])))
+                if (left_edge, u[1]) in self.viewVertices_prime:
+                    self.viewEdges_prime.add(((u[0], u[1]), (left_edge, u[1])))
+                    self.viewEdges_prime.add(((left_edge, u[1]), (u[0], u[1])))
 
-                if (u[0],u[1]+1) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]+1)))
-                    self.viewEdges_prime.add(((u[0],u[1]+1),(u[0],u[1])))
+                if (u[0], up_edge) in self.viewVertices_prime:
+                    self.viewEdges_prime.add(((u[0], u[1]), (u[0], up_edge)))
+                    self.viewEdges_prime.add(((u[0], up_edge), (u[0], u[1])))
 
-                if (u[0],u[1]-1) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]-1)))
-                    self.viewEdges_prime.add(((u[0],u[1]-1),(u[0],u[1])))
+                if (u[0], down_edge) in self.viewVertices_prime:
+                    self.viewEdges_prime.add(((u[0], u[1]), (u[0], down_edge)))
+                    self.viewEdges_prime.add(((u[0], down_edge), (u[0], u[1])))
 
-            s=self.viewVertices.copy()
-            E=self.viewEdges.copy()
-            T=self.viewTasks.copy()
+            s = self.viewVertices.copy()
+            E = self.viewEdges.copy()
+            T = self.viewTasks.copy()
 
-            s_prime=self.viewVertices_prime.copy()
-            E_prime=self.viewEdges_prime.copy()
-            T_prime=self.viewTasks_prime.copy()
-            ##print(E)
+            s_prime = self.viewVertices_prime.copy()
+            E_prime = self.viewEdges_prime.copy()
+            T_prime = self.viewTasks_prime.copy()
+            # print(E)
             for u in s:
-                if u!=(self.posX,self.posY) and not ut.bfs(s,E,(self.posX,self.posY),u):
+                if u != (self.posX, self.posY) and not bfs(s, E, (self.posX, self.posY), u):
                     for e in E:
-                        if (e[0]==u or e[1]==u) and e in self.viewEdges:
+                        if (e[0] == u or e[1] == u) and e in self.viewEdges:
                             self.viewEdges.remove(e)
                     self.viewVertices.remove(u)
                     if u in T:
@@ -436,9 +729,9 @@ class Agent:
             del s
 
             for u in s_prime:
-                if u!=(self.posX,self.posY) and not ut.bfs(s_prime,E_prime,(self.posX,self.posY),u):
+                if u != (self.posX, self.posY) and not bfs(s_prime, E_prime, (self.posX, self.posY), u):
                     for e in E_prime:
-                        if (e[0]==u or e[1]==u) and e in self.viewEdges_prime:
+                        if (e[0] == u or e[1] == u) and e in self.viewEdges_prime:
                             self.viewEdges_prime.remove(e)
                     self.viewVertices_prime.remove(u)
                     if u in T_prime:
@@ -446,17 +739,18 @@ class Agent:
             del s_prime
 
     def mapOffset(self,offX,offY,mapVerts,mapEdges,mapTasks,mapAgents):
-        vertices=set()
-        edges=set()
-        taskSet=set()
-        agentSet={}
+        vertices = set()
+        edges = set()
+        taskSet = set()
+        agentSet = {}
         for v in mapVerts:
-            vertices.add((v[0]-offX,v[1]-offY))
+            vertices.add((round(v[0]-offX, 1), round(v[1]-offY, 1)))
         for e in mapEdges:
-            newEdge=((e[0][0]-offX,e[0][1]-offY),(e[1][0]-offX,e[1][1]-offY))
+            newEdge = ((round(e[0][0]-offX, 1), round(e[0][1]-offY, 1)),
+                       (round(e[1][0]-offX, 1), round(e[1][1]-offY, 1)))
             edges.add(newEdge)
         for t in mapTasks:
-            taskSet.add((t[0]-offX,t[1]-offY))
+            taskSet.add((round(t[0]-offX, 1), round(t[1]-offY, 1)))
         for a in mapAgents:
             agentSet[a.ID] = (offX, offY)
             # agent.posX-=offX
@@ -473,25 +767,89 @@ class Agent:
         self.localTasks=l[2]
         self.localAgents=l[3]
 
-def updateAgentToAgentView():
+def updateAgentToAgentView(poses):
+    # changed to using vectors based on sensor readings
     for a in agents:
         a.viewAgents.add(a)
         a.viewAgents_prime.add(a)
-        for b in agents:
-            if (b.posX,b.posY) in a.viewVertices:
-                a.viewAgents.add(b)
-
-            if (b.posX_prime,b.posY_prime) in a.viewVertices_prime:
-                a.viewAgents_prime.add(b)
+        # print("Agent ", a.ID-1," view:", )
+        for idx in delta_disk_neighbors(poses, a.ID-1, step*k+(step*0.25)):
+            # dxi = poses[:2,[a.ID-1]] - poses[:2,[idx]]
+            # norm_ = np.linalg.norm(dxi)
+            # angle = angle_between(np.array(NORTH), poses[:2,[idx]])
+            for v in a.viewVertices:
+                dxi = np.reshape(np.array(v), (2,1)) - poses[:2,[idx]]
+                # print("distance",dxi)
+                # print(poses[:2, [idx]])
+                # print()
+                if np.linalg.norm(dxi) < 0.1:
+                    a.viewAgents.add(agents[idx])
+                    break
+            
+            for v in a.viewVertices_prime:
+                dxi = np.reshape(np.array(v), (2,1)) - poses[:2,[idx]]
+                if np.linalg.norm(dxi) < 0.1:
+                    a.viewAgents_prime.add(agents[idx])
+                    break
 
 id = 1
 agents = []
 for i in range(A):
-    agent = Agent(agentVertices[i][0], agentVertices[i][1], id, 11)
+    agent = Agent(agentVertices[i][0], agentVertices[i][1], NORTH, id, 11)
     agents.append(agent)
-    print("{}: ({},{})".format(agent.ID, agent.posX, agent.posY))
-
+    # print("{}: ({},{})".format(agent.ID, agent.posX, agent.posY))
     id += 1
+
+pos = []
+for a in agents:
+    pos.append([a.posX, a.posY, a.orientation])
+
+starting_pos = np.asarray(pos).T
+
+# print(starting_pos)
+r_env = robotarium.Robotarium(number_of_robots=A, show_figure=True, initial_conditions=starting_pos,sim_in_real_time=True)
+
+## Uncomment below when doing an actual experiment on robotarium with graphics
+
+marker_size_obs = determine_marker_size(r_env, 0.03)
+marker_obs_sml = determine_marker_size(r_env, 0.02)
+marker_size_goal = determine_marker_size(r_env, 0.02)
+marker_size_robot = determine_marker_size(r_env, 0.04)
+taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
+for ii in range(len(taskVertices))]
+
+horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
+vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
+
+# square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
+
+print(len(obs_dir))
+print(len(obstacles))
+
+shapes_dir = {
+    0: horizontal_obs,
+    1: vert_obs,
+    2: 's'
+}
+# 0 - horizontal
+# 1 - vertical
+# 2 - square
+
+# obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_obs_sml if obs_dir[ii] == 2 else marker_size_obs, marker=shapes_dir[obs_dir[ii]], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
+# for ii in range(len(obstacles))]
+
+obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
+for ii in range(len(obstacles))]
+
+
+robot_markers = []
+
+# unicycle_pose_controller = my_controller2(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
+# unicycle_pose_controller = create_clf_unicycle_pose_controller()
+unicycle_pose_controller = create_hybrid_unicycle_pose_controller(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
+
+# Create barrier certificates to avoid collision
+uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.12, 0.01, 0.2)
 
 def getOppositeDirection(direction):
     if direction == 'n':
@@ -505,13 +863,14 @@ def getOppositeDirection(direction):
     elif direction == 'q':
         return 'q'
 
-def getExplorationMove(agent, lookupTable):
-    legal = getLegalMovesFrom(agent.posX, agent.posY)
+def getExplorationMove(agent):
+    legal = getLegalMovesFrom(agent)
     if exp_strat == 0:
         if len(legal) > 1:
             legal.remove('q')
         return random.choice(legal)
 
+    """
     elif exp_strat == -1:
         pos = (agent.posX, agent.posY)
         shortestDist = float('inf')
@@ -572,47 +931,175 @@ def getExplorationMove(agent, lookupTable):
             agent.exploring = False
 
         return direction
+    """
 
-def getLegalMovesFrom(x,y):
-    moves=['q']
-    if x+1 < rows and x+1 >= 0 and gridGraph[x+1][y] != 0:
-        moves.append('e')
-    if x-1 < rows and x-1 >= 0 and gridGraph[x-1][y] != 0:
-        moves.append('w')
-    if y+1 < cols and y+1 >= 0 and gridGraph[x][y+1] != 0:
-        moves.append('n')
-    if y-1 < cols and y-1 >= 0 and gridGraph[x][y-1] != 0:
-        moves.append('s')
+## Guaranteed to move
+def getLegalMovesFrom(agent):
+    # Guard against potential collision
+    moves = ['q']
+    filtered = [x for x in a.viewAgents if x.ID < agent.ID]
+    filtered_pos = []
+    for n in filtered:
+        filtered_pos.append((n.posX, n.posY))
+
+    up = round(agent.posY+1*step, 1)
+    down = round(agent.posY-1*step, 1)
+    left = round(agent.posX-1*step, 1)
+    right = round(agent.posX+1*step, 1)
+
+    # check if it exist in the grid bounds
+    if (right, agent.posY) in vertices:
+        # for remaining hops
+        safe = True
+        if (right, up) in vertices and (right, up) in filtered_pos:
+            safe = False
+        if safe and (right, down) in vertices and (right, down) in filtered_pos:
+            safe = False
+        if safe:
+            moves.append('e')
+    # check if it exist in the grid bounds
+    if (left, agent.posY) in vertices:
+        # for remaining hops
+        safe = True
+        if (left, up) in vertices and (left, up) in filtered_pos:
+            safe = False
+        if safe and (left, down) in vertices and (left, down) in filtered_pos:
+            safe = False
+        if safe:
+            moves.append('w')
+    # check if it exist in the grid bounds
+    if (agent.posX, up) in vertices:
+        # for remaining hops
+        safe = True
+        if (left, up) in vertices and (left, up) in filtered_pos:
+            safe = False
+        if safe and (right, up) in vertices and (right, up) in filtered_pos:
+            safe = False
+        if safe:
+            moves.append('n')
+    # check if it exist in the grid bounds
+    if (agent.posX, down) in vertices:
+        # for remaining hops
+        safe = True
+        if (left, down) in vertices and (left, down) in filtered_pos:
+            safe = False
+        if safe and (right, down) in vertices and (right, down) in filtered_pos:
+            safe = False
+        if safe:
+            moves.append('s')
+    # if len(moves) == 0:
+    #     moves.append('q')
     return moves
 
-def stateUpdate():
-    sys.stdout.flush()
+def executeStep(r_pos, eAgnt, goal_points):
+    if (np.size(at_pose(r_pos[:, eAgnt], goal_points[:,eAgnt])) != A):
+        # Get poses of agents
+        r_pos = r_env.get_poses()
+        ## Remove Tasks
+        remove_t = set()
+        for t in taskVertices:
+            if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
+                remove_t.add(t)
+                # for ts in taskss:
+                #     if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
+                #         ts.set_visible(False)
+                #         break
+        for t in remove_t:
+            taskVertices.remove(t)
+        # Create unicycle control inputs
+        dxu = unicycle_pose_controller(r_pos, goal_points)
+        # Create safe control inputs (i.e., no collisions)
+        dxu = uni_barrier_cert(dxu, r_pos)
+        # Set the velocities
+        r_env.set_velocities(np.arange(A), dxu)
+        # Iterate the simulation
+        r_env.step()
+        return r_pos
+    else:
+        r_pos = r_env.get_poses()
+        r_env.step()
+        return r_pos
 
+## No need to change StateUpdate if the 
+# exploration_move and CAMAR ensure that 
+# no collisions happen then this is not needed
+def stateUpdate():
+    ## check if a collision with an agent from another cluster occurs
+    ## and if so then re-route
+    ## NOTE: Intra-cluster collision and exploration collisions are avoided in respective
+    ## functions
+    ## Better way, let Intra-cluster collision happen and just resolve it here
+    sys.stdout.flush()
+    rstart_x = -0.8
+    rstart_y = 0.8
+
+    prev_positions = np.zeros((rows, cols))
+    ## Better to
+    ## sort the agents based on no.of remaining move list len in ascending order
+    ## not considering wait moves at the end
     for a in agents:
-        if visualizer:
-            changeCell(a.posX, a.posY, 'blank', 0)
+        # if visualizer:
+        #     changeCell(a.posX, a.posY, 'blank', 0)
+        posX = round(abs(a.posX - rstart_x) / step)
+        posY = round(abs(a.posY - rstart_y) / step)
 
         if a.getDir() == 'e':
-            a.setXPos(a.posX+1)
+            east_move = round(a.posX+1*step, 1)
+            posX_east = round(abs(east_move - rstart_x) / step)
+            if prev_positions[posX_east, posY] != 0:
+                ## Collision with an agent
+                # assert a.clusterId != b.clusterId
+                if len(a.moves) > 0:
+                    ## take the next move until a non-colliding location is found
+                    ## For now just take the next move
+                    todo = 3
+                # else:
+                #     ## check if colliding agent has further moves
+                #     ## Not necessary if sort
+                #     b = agents[prev_positions[posX_east, posY]-1]
+                #     if 
+
+            a.setXPos(east_move)
+            a.setOrientation(EAST)
+            prev_positions[posX_east, posY] = a.ID
         elif a.getDir() == 'w':
-            a.setXPos(a.posX-1)
+            west_move = round(a.posX-1*step, 1)
+            posX_west = round(abs(west_move - rstart_x) / step)
+            prev_positions[posX_west, posY]
+            a.setXPos(west_move)
+            a.setOrientation(WEST)
         elif a.getDir() == 's':
-            a.setYPos(a.posY-1)
+            south_move = round(a.posY-1*step, 1)
+            posY_south = round(abs(south_move - rstart_y) / step)
+            prev_positions[posX, posY_south]
+            a.setYPos(south_move)
+            a.setOrientation(SOUTH)
         elif a.getDir() == 'n':
-            a.setYPos(a.posY+1)
+            north_move = round(a.posY+1*step, 1)
+            posY_north = round(abs(north_move - rstart_y) / step)
+            prev_positions[posX, posY_north]
+            a.setYPos(north_move)
+            a.setOrientation(NORTH)
         elif a.getDir() == 'q':
+            prev_positions[posX, posY]
             pass
         else:
             raise ValueError("Incorrect direction. ")
 
-        if visualizer:
-            changeCell(a.posX, a.posY, 'agent', a.color)
+        # if visualizer:
+        #     changeCell(a.posX, a.posY, 'agent', a.color)
 
-        if (a.posX, a.posY) in taskVertices:
-            taskVertices.remove((a.posX, a.posY))
+        ## Task should be removed when the actual motion happens
+        # if (a.posX, a.posY) in taskVertices:
+        #     taskVertices.remove((a.posX, a.posY))
 
         sys.stdout.flush()
+    pos = []
+    for a in agents:
+        pos.append([a.posX, a.posY, a.orientation])
+    return np.asarray(pos).T
 
+"""
 def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable):
     currentPos={}
     for a in agents:
@@ -773,9 +1260,10 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
     elif bestMove==(agent.posX,agent.posY):
         ret= 'q'
     return ret,minCost
+"""
 
 def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
-
+    # Change to robotarium coordinates
     for vertex in networkVertices:
         try:
             assert (vertex, vertex) in networkEdges
@@ -824,7 +1312,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                         bestNewPos = None
 
                         assert tempPositions[a_ID] in networkVertices
-                        dist, path = ut.bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
+                        dist, path = bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
                         
                         if dist == None:
                             """
@@ -855,7 +1343,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             del tempCurrentTasks
 
     assert bestMove != None     ## should at least wait... 
-
+    print("Agent: ", agent_ID)
     print("Qfactors: ", Qfactors)
     minQ = float('inf')
     for factor in Qfactors:
@@ -922,7 +1410,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                 break
         if not found_wait:
             ## Find the nearest task
-            _, path = ut.bfsNearestTask(networkVertices, networkEdges,
+            _, path = bfsNearestTask(networkVertices, networkEdges,
                                         agent_pos, taskPos)
             assert path[-1] in taskPos
             nearestTask = path[-1]
@@ -935,13 +1423,13 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                     euclidean = r2_dist
                     bestMove = factor[0]
 
-    if bestMove == (agent_pos[0]+1,agent_pos[1]):
+    if bestMove == (round(agent_pos[0]+step, 1),agent_pos[1]):
         ret = 'e'
-    elif bestMove == (agent_pos[0]-1,agent_pos[1]):
+    elif bestMove == (round(agent_pos[0]-step, 1),agent_pos[1]):
         ret = 'w'
-    elif bestMove == (agent_pos[0],agent_pos[1]+1):
+    elif bestMove == (agent_pos[0],round(agent_pos[1]+step, 1)):
         ret = 'n'
-    elif bestMove == (agent_pos[0],agent_pos[1]-1):
+    elif bestMove == (agent_pos[0],round(agent_pos[1]-step, 1)):
         ret = 's'
     elif bestMove == agent_pos:
         ret = 'q'
@@ -952,12 +1440,14 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
         print()
     return ret, minCost
 
+#Only centroid start this
 def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkAgents, taskPos, agent):
+    # Change to robotarium coordinates
     (x_offset, y_offset) = agent[centroidID]
     agentPositions = {}
     for a_ID in networkAgents:
-        agentPositions[a_ID] = (agents[a_ID-1].posX-networkAgents[a_ID][0],
-                                agents[a_ID-1].posY-networkAgents[a_ID][1])
+        agentPositions[a_ID] = (round(agents[a_ID-1].posX-networkAgents[a_ID][0], 1),
+                                round(agents[a_ID-1].posY-networkAgents[a_ID][1], 1))
     tempTasks = taskPos.copy()
 
     allPrevMoves = {}
@@ -972,10 +1462,10 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
             assert agent_pos in networkVertices
             if only_base_policy:
                 ## need to move to global coordinates
-                taskList = [(task[0]+x_offset,task[1]+y_offset) for task \
-                            in tempTasks]
-                global_temp_pos = (agentPositions[a_ID][0]+x_offset,
-                                    agentPositions[a_ID][1]+y_offset)
+                # taskList = [(task[0]+x_offset,task[1]+y_offset) for task \
+                #             in tempTasks]
+                # global_temp_pos = (agentPositions[a_ID][0]+x_offset,
+                #                     agentPositions[a_ID][1]+y_offset)
                 move,c = getClosestClusterTask(agent_pos=agentPositions[a_ID], 
                                                 taskList=tempTasks, 
                                                 lookupTable=None,
@@ -986,17 +1476,36 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                                         agentPositions, tempTasks, 
                                         {a_ID:agent_pos}, 
                                         waitAgents)
+            # Check if the move is causing a collision and if so then instead append a wait move
+            collision = False
+            if move == 'n':
+                temp_pos = (agent_pos[0],round(agent_pos[1]+step, 1))
+            elif move == 's':
+                temp_pos = (agent_pos[0],round(agent_pos[1]-step, 1))
+            elif move == 'e':
+                temp_pos = (round(agent_pos[0]+step, 1),agent_pos[1])
+            elif move == 'w':
+                temp_pos = (round(agent_pos[0]-step, 1),agent_pos[1])
+            for a_id in prevMoves:
+                if temp_pos == agentPositions[a_id]:
+                    print("Agent: ", a_ID, " colliding with Agent: ", a_id)
+                    move = 'q'
+                    collision = True
+                    if a_id in waitAgents:
+                        waitAgents.append(a_ID)
+                    break
+
             prevMoves[a_ID] = move
             allPrevMoves[a_ID].append(move)
             if move == 'n':
-                agentPositions[a_ID] = (agent_pos[0],agent_pos[1]+1)
+                agentPositions[a_ID] = (agent_pos[0],round(agent_pos[1]+step, 1))
             elif move == 's':
-                agentPositions[a_ID] = (agent_pos[0],agent_pos[1]-1)
+                agentPositions[a_ID] = (agent_pos[0],round(agent_pos[1]-step, 1))
             elif move == 'e':
-                agentPositions[a_ID] = (agent_pos[0]+1,agent_pos[1])
+                agentPositions[a_ID] = (round(agent_pos[0]+step, 1),agent_pos[1])
             elif move == 'w':
-                agentPositions[a_ID] = (agent_pos[0]-1,agent_pos[1])
-            elif move == 'q':
+                agentPositions[a_ID] = (round(agent_pos[0]-step, 1),agent_pos[1])
+            elif move == 'q' and not collision:
                 waitAgents.append(a_ID)
                 pass
 
@@ -1027,6 +1536,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
     the tuple (0,0) in the local view. 
 
     """
+    """
     if depots:
         for a_ID in agentPositions:
             while agentPositions[a_ID] != (0,0):
@@ -1053,7 +1563,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                                             agentPositions[a_ID][1])
                 else: 
                     raise ValueError("Agent needs to move.")
-
+    """
     return allPrevMoves
 
 def mergeTimelines():
@@ -1092,11 +1602,13 @@ def mergeTimelines():
         agent.marker=agent.marker_prime
         agent.dfsNext=agent.dfsNext_prime
 
+        """
         if agent.gui_split == True:
             #print(agent.ID, agent.color)
             if visualizer:
                 changeCell(agent.posX, agent.posY, "agent", agent.color)
             agent.gui_split = False
+        """
 
     ## Merge Mutual Connections
     for agent in agents:
@@ -1110,25 +1622,38 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
     (agent_posX, agent_posY) = agent_pos
     min_dist = float('inf')
     best_move = None
+    if agent_posX == 0:
+        pos_x = 0.0
+    else:
+        pos_x = agent_posX
+    if agent_posY == 0:
+        pos_y = 0.0
+    else:
+        pos_y = agent_posY
     for task in taskList:
+        task_co = (round(task[0],1),round(task[1],1))
         if lookupTable != None:
-            dist, path = lookupTable[str((agent_posX, agent_posY))][str(task)]
+            try:
+                dist, path = lookupTable[str((pos_x, pos_y))][str(task_co)]
+            except (AssertionError, KeyError):
+                continue
         else:
-            dist, path = ut.dirShortestPath(kwargs['vertices'], 
+            dist, path = dirShortestPath(kwargs['vertices'], 
                                             kwargs['edges'],
-                                            agent_pos, task)
+                                            (pos_x, pos_y), task_co)
         if dist != None and dist < min_dist:
             min_dist = dist
             best_move = path[1]
-    if best_move == (agent_posX+1, agent_posY):
+    
+    if best_move == (round(agent_posX+step,1), agent_posY):
         next_dir = 'e'
-    elif best_move == (agent_posX-1, agent_posY):
+    elif best_move == (round(agent_posX-step,1), agent_posY):
         next_dir = 'w'
-    elif best_move == (agent_posX, agent_posY-1):
+    elif best_move == (agent_posX, round(agent_posY-step,1)):
         next_dir = 's'
-    elif best_move == (agent_posX, agent_posY+1):
+    elif best_move == (agent_posX, round(agent_posY+step,1)):
         next_dir = 'n'
-    elif best_move == None: ## isolated agents... 
+    elif best_move == None:
         next_dir = 'q'
     else:
         raise ValueError("Best Move is not a move. ")
@@ -1143,10 +1668,11 @@ def main():
                         '# of Agents': [], '# of Tasks': [],
                         'k': [], 'psi': [], 'Total Time (s)': [],
                         '# of Exploration': []})
-    lookupTable = offlineTrainRes
+    # lookupTable = offlineTrainRes
 
     if centralized:
         begin = time.time()
+        """
         while len(taskVertices) > 0:
             moves = {}
             for a in agents:
@@ -1168,34 +1694,38 @@ def main():
 
             time.sleep(wait_time)
             sys.stdout.flush()
-            if visualizer:
-                costLabel = Label(root, text='Total Cost: ' + str(totalCost))
-                costLabel.grid(row=rows+1, column=cols-3,columnspan=4)
+            # if visualizer:
+            #     costLabel = Label(root, text='Total Cost: ' + str(totalCost))
+            #     costLabel.grid(row=rows+1, column=cols-3,columnspan=4)
         end = time.time()
         totalTime = end-begin
         print("Done. ")
         new_data['# of Exploration Steps'] = str(0)
         new_data['Wait Cost'] = str(waitCost)
-        if visualizer:
-            quitButton.invoke()
-
+        # if visualizer:
+        #     quitButton.invoke()
+        """
     else:
         try:
             begin =  time.time()
             explore_steps = 0
+            r_pos = r_env.get_poses()
 
+            robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
+
+            r_env.step()
             rounds = 0
-            COMPLETION_PARAM = 0.1
+            COMPLETION_PARAM = 0.0
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
             while len(taskVertices) > target_completion:
-                time.sleep(wait_time)
+                # time.sleep(wait_time)
 
                 rounds += 1
 
                 for a in agents:
-                    a.updateView()
+                    a.updateView(r_pos)
 
-                updateAgentToAgentView()
+                updateAgentToAgentView(r_pos)
                 sys.stdout.flush()
 
                 """
@@ -1264,11 +1794,12 @@ def main():
                         print()
 
                 ## Update colors for centroids...
+                """
                 for a in agents:
                     if len(a.clusterID) > 0 and a.ID == a.clusterID[0]:
                         a.color_prime = colors.pop(0)
                         a.gui_split = True
-
+                """
                 mergeTimelines()
 
                 for i in range(psi):
@@ -1288,7 +1819,7 @@ def main():
                                     a.clusterID_prime.append(x.clusterID[0])
                                     a.parent_prime = x
                                     a.color_prime = x.color
-                                    a.gui_split = True
+                                    # a.gui_split = True
 
                                     if a not in x.children and a != x:
                                         x.children_prime.append(a)
@@ -1326,7 +1857,7 @@ def main():
                             a.message_prime = True
                             a.parent_prime = None ## no parent for centroids...
                             a.color_prime = colors.pop(0)
-                            a.gui_split = True
+                            # a.gui_split = True
 
                             for x in a.viewAgents:
                                 if x.message == False and x != a:
@@ -1334,7 +1865,7 @@ def main():
                                     x.message_prime = True ## now x has received the message about the new centroid...
                                     x.parent_prime = a ## a is the new parent...
                                     x.color_prime = a.color ## get a's color...
-                                    x.gui_split = True
+                                    # x.gui_split = True
 
                                     if x not in a.children:
                                         a.children_prime.append(x)
@@ -1374,9 +1905,11 @@ def main():
 
                         mergeTimelines()
                     ## perform a final visualizer update
+                    """
                     for a in agents:
                         if len(a.clusterID) > 0:
                             a.gui_split = True
+                    """
                     mergeTimelines()
                     if '1' in verbose or verbose == '-1':
                         print("Phase 4.5: ")
@@ -1412,7 +1945,7 @@ def main():
                                         x.message_prime = True
                                         x.parent_prime = a
                                         x.color_prime = a.color
-                                        x.gui_split = True
+                                        # x.gui_split = True
 
                                         if x not in a.children:
                                             a.children_prime.append(x)
@@ -1459,7 +1992,7 @@ def main():
                                 if a in b.children: 
                                     b.children.remove(a)
 
-                time.sleep(wait_time)
+                # time.sleep(wait_time)
 
                 if '1' in verbose or verbose == '-1':
                     print("Phase 7: ")
@@ -1486,6 +2019,8 @@ def main():
                 Assert that all colors match to clusterID number. 
 
                 """
+                ## TODO: See if color update is required in robotarium
+                """
                 for _ in range(N):
                     for a in agents:
                         if a.parent != None:
@@ -1494,7 +2029,7 @@ def main():
                                 ## only update visualizer if color changes
                                 a.gui_split = True
                     mergeTimelines()
-
+                """
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
                     for a in agents:
@@ -1706,6 +2241,7 @@ def main():
 
                 ## loose upper bound... 
                 # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
+                # Sync execution of actions all at once
                 num_iterations = (2**psi)*k
                 for i in range(num_iterations):
                     if '3' in verbose or verbose == '-1':
@@ -1713,17 +2249,20 @@ def main():
                         print(len(taskVertices), totalCost)
                     if 't' in verbose or verbose == '-1':
                         print("Remaining Tasks: ", len(taskVertices))
-                    if len(taskVertices) < COMPLETION_PARAM*numTasks:
+                    if len(taskVertices) == 0:
                         break
+                    ## Still exploring
                     for a in agents:
                         if a.exp_dist_remaining != 0:
                             a.clusterID = []
 
                     for a in agents:
+                        ## If still exploring pick a random new move
                         if len(a.clusterID)==0:
-                            a.updateView()
+                            ## Whys do a updateView here ??
+                            a.updateView(r_pos)
                             if len(a.viewTasks) == 0:
-                                a.dir=getExplorationMove(a, lookupTable)
+                                a.dir=getExplorationMove(a)
                                 if a.dir != 'q':
                                     if verbose == 'x':
                                         print(a.ID, a.dir)
@@ -1734,6 +2273,7 @@ def main():
                             else:
                                 a.dir = 'q'
                                 waitCost += 1
+                        ## continue with the move list computed previously ** as oppose to calculating a new move based on parents move
                         else:
                             try:
                                 a.dir = a.moves.pop(0)
@@ -1744,8 +2284,44 @@ def main():
                             except IndexError:
                                 a.dir = 'q'
                                 waitCost += 1
-                    stateUpdate()
-                    time.sleep(wait_time)
+                    goal_points = stateUpdate()
+
+                    # print(r_pos)
+                    # print(goal_points)
+
+                    ### Execute Sync position updates
+                    while (np.size(at_pose(r_pos, goal_points)) != A):
+                        # Get poses of agents
+                        r_pos = r_env.get_poses()
+
+                        for i in range(A):
+                            agent = agents[i]
+                            # Comment this for bulk runs
+                            robot_markers[i].set_offsets(r_pos[:2,i].T)
+                        ## Remove Tasks
+                        remove_t = set()
+                        for t in taskVertices:
+                            if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
+                                remove_t.add(t)
+                                # Comment this for bulk runs
+                                for ts in taskss:
+                                    if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
+                                        ts.set_visible(False)
+                                        break
+
+                        for t in remove_t:
+                            taskVertices.remove(t)
+
+                        # Create unicycle control inputs
+                        dxu = unicycle_pose_controller(r_pos, goal_points)
+                        # Create safe control inputs (i.e., no collisions)
+                        dxu = uni_barrier_cert(dxu, r_pos)
+                        # Set the velocities
+                        r_env.set_velocities(np.arange(A), dxu)
+                        # Iterate the simulation
+                        r_env.step()
+                    
+                    # time.sleep(wait_time)
 
                 for a in agents:
                     a.deallocate()
@@ -1756,12 +2332,16 @@ def main():
                     a.posX_prime = a.posX
                     a.posY_prime = a.posY
 
-                time.sleep(wait_time)
-
+                # time.sleep(wait_time)
+                r_pos = r_env.get_poses()
+                for i in range(A):
+                    agent = agents[i]
+                    robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
+                r_env.step()
                 sys.stdout.flush()
-                if visualizer:
-                    costLabel=Label(root,text='Total Cost: '+str(totalCost))
-                    costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
+                # if visualizer:
+                #     costLabel=Label(root,text='Total Cost: '+str(totalCost))
+                #     costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
 
             end = time.time()
             #print("Decentralized Cost: ", totalCost)
@@ -1771,8 +2351,10 @@ def main():
 
             new_data['# of Exploration Steps'] = explore_steps
             new_data['Wait Cost'] = waitCost
-            if visualizer:
-                quitButton.invoke()
+            # if visualizer:
+            #     quitButton.invoke()
+
+            r_env.call_at_scripts_end()
 
         except KeyboardInterrupt:
             sys.exit(0)
@@ -1793,6 +2375,7 @@ def start():
 # if __name__ == "__main__":
 #   main()
 #Add Interface
+"""
 if visualizer:
     goButton=Button(root,text='Start',pady=10,padx=50,command=start)
     goButton.grid(row=rows+1, column=0, columnspan=cols-4)
@@ -1805,5 +2388,6 @@ if visualizer:
 
     root.mainloop()
 else:
-    main()
+"""
+main()
 
