@@ -1,3 +1,4 @@
+import functools
 import sys
 from tkinter import *
 from PIL import ImageTk,Image
@@ -43,7 +44,7 @@ rows = 9
 cols = 9
 size = 9
 step = 0.2
-verbose = '0'
+verbose = '-1'
 
 new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
@@ -769,6 +770,7 @@ class Agent:
 
 def updateAgentToAgentView(poses):
     # changed to using vectors based on sensor readings
+    ## why can't this be done for each agent ? becoz some other agents might move later into the view
     for a in agents:
         a.viewAgents.add(a)
         a.viewAgents_prime.add(a)
@@ -823,8 +825,8 @@ vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
 
 # square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
-print(len(obs_dir))
-print(len(obstacles))
+# print(len(obs_dir))
+# print(len(obstacles))
 
 shapes_dir = {
     0: horizontal_obs,
@@ -846,10 +848,16 @@ robot_markers = []
 
 # unicycle_pose_controller = my_controller2(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
 # unicycle_pose_controller = create_clf_unicycle_pose_controller()
-unicycle_pose_controller = create_hybrid_unicycle_pose_controller(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
+##og
+# unicycle_pose_controller = create_hybrid_unicycle_pose_controller(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
+unicycle_pose_controller = create_hybrid_unicycle_pose_controller(0.3, 0.3, 0.2, np.pi, 0.05, 0.03, 0.01)
+# unicycle_pose_controller = create_hybrid_unicycle_pose_controller()
+# unicycle_pose_controller = create_clf_unicycle_position_controller(linear_velocity_gain=0.5, angular_velocity_gain=1)
 
 # Create barrier certificates to avoid collision
 uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.12, 0.01, 0.2)
+# uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.15, 0.05, 0.2)
+# uni_barrier_cert = create_unicycle_barrier_certificate()
 
 def getOppositeDirection(direction):
     if direction == 'n':
@@ -863,8 +871,8 @@ def getOppositeDirection(direction):
     elif direction == 'q':
         return 'q'
 
-def getExplorationMove(agent):
-    legal = getLegalMovesFrom(agent)
+def getExplorationMove(agent, updated_pos):
+    legal = getLegalMovesFrom(agent, updated_pos)
     if exp_strat == 0:
         if len(legal) > 1:
             legal.remove('q')
@@ -934,61 +942,33 @@ def getExplorationMove(agent):
     """
 
 ## Guaranteed to move
-def getLegalMovesFrom(agent):
+def getLegalMovesFrom(agent, updated_pos):
     # Guard against potential collision
     moves = ['q']
-    filtered = [x for x in a.viewAgents if x.ID < agent.ID]
-    filtered_pos = []
-    for n in filtered:
-        filtered_pos.append((n.posX, n.posY))
-
+    ## NOTNEEDED: all the agents in the view and ones which have moved before
+    ## use updated_pos instead of a.viewAgents since that is outdated
+    # filtered = [x for x in a.viewAgents if x.ID < agent.ID]
+    # filtered_pos = []
+    # for n in filtered:
+    #     filtered_pos.append((n.posX, n.posY))
+    ## TODO: Rewrite this copy pasted crap, this is not right, why are there 2 hops ?
     up = round(agent.posY+1*step, 1)
     down = round(agent.posY-1*step, 1)
     left = round(agent.posX-1*step, 1)
     right = round(agent.posX+1*step, 1)
 
     # check if it exist in the grid bounds
-    if (right, agent.posY) in vertices:
-        # for remaining hops
-        safe = True
-        if (right, up) in vertices and (right, up) in filtered_pos:
-            safe = False
-        if safe and (right, down) in vertices and (right, down) in filtered_pos:
-            safe = False
-        if safe:
-            moves.append('e')
+    if (right, agent.posY) in vertices and not updated_pos.get((right, agent.posY)):
+        moves.append('e')
     # check if it exist in the grid bounds
-    if (left, agent.posY) in vertices:
-        # for remaining hops
-        safe = True
-        if (left, up) in vertices and (left, up) in filtered_pos:
-            safe = False
-        if safe and (left, down) in vertices and (left, down) in filtered_pos:
-            safe = False
-        if safe:
-            moves.append('w')
+    if (left, agent.posY) in vertices and not updated_pos.get((left, agent.posY)):
+        moves.append('w')
     # check if it exist in the grid bounds
-    if (agent.posX, up) in vertices:
-        # for remaining hops
-        safe = True
-        if (left, up) in vertices and (left, up) in filtered_pos:
-            safe = False
-        if safe and (right, up) in vertices and (right, up) in filtered_pos:
-            safe = False
-        if safe:
-            moves.append('n')
+    if (agent.posX, up) in vertices and not updated_pos.get((agent.posX, up)):
+        moves.append('n')
     # check if it exist in the grid bounds
-    if (agent.posX, down) in vertices:
-        # for remaining hops
-        safe = True
-        if (left, down) in vertices and (left, down) in filtered_pos:
-            safe = False
-        if safe and (right, down) in vertices and (right, down) in filtered_pos:
-            safe = False
-        if safe:
-            moves.append('s')
-    # if len(moves) == 0:
-    #     moves.append('q')
+    if (agent.posX, down) in vertices and not updated_pos.get((agent.posX, down)):
+        moves.append('s')
     return moves
 
 def executeStep(r_pos, eAgnt, goal_points):
@@ -1020,71 +1000,363 @@ def executeStep(r_pos, eAgnt, goal_points):
         r_env.step()
         return r_pos
 
-## No need to change StateUpdate if the 
-# exploration_move and CAMAR ensure that 
-# no collisions happen then this is not needed
-def stateUpdate():
-    ## check if a collision with an agent from another cluster occurs
-    ## and if so then re-route
-    ## NOTE: Intra-cluster collision and exploration collisions are avoided in respective
-    ## functions
-    ## Better way, let Intra-cluster collision happen and just resolve it here
+def movePrecedenceCmp(agentA, agentB):
+    ## simple precedence filter based on remaining actual moves in the move list
+    ## Filters out even the wait moves in between, but ideally should remove only the trailing wait moves
+    agentA_filtMovesLen = len([x for x in agentA.moves if x != 'q'])
+    agentB_filtMovesLen = len([x for x in agentB.moves if x != 'q'])
+    return agentB_filtMovesLen - agentA_filtMovesLen
+    # return -1 if swap A before B
+    # return 0 if no swap
+    # return 1 if swap B before A
+
+def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
+
     sys.stdout.flush()
-    rstart_x = -0.8
-    rstart_y = 0.8
+    ## First resolve collision between agents in clusters and have them move first
 
-    prev_positions = np.zeros((rows, cols))
-    ## Better to
-    ## sort the agents based on no.of remaining move list len in ascending order
-    ## not considering wait moves at the end
+    all_pos = {}
+    prev_pos = {}
+    agentsInClusterLen = 0
+
     for a in agents:
-        # if visualizer:
-        #     changeCell(a.posX, a.posY, 'blank', 0)
-        posX = round(abs(a.posX - rstart_x) / step)
-        posY = round(abs(a.posY - rstart_y) / step)
+        # a.back = False
+        if len(a.clusterID)!=0:
+            ## Add the new pos to old pos_directory
+            if prev_pos.get((a.posX, a.posY)):
+                prev_pos[(a.posX, a.posY)].append(a.ID)
+            else:
+                prev_pos[(a.posX, a.posY)] = [a.ID]
 
-        if a.getDir() == 'e':
-            east_move = round(a.posX+1*step, 1)
-            posX_east = round(abs(east_move - rstart_x) / step)
-            if prev_positions[posX_east, posY] != 0:
-                ## Collision with an agent
-                # assert a.clusterId != b.clusterId
-                if len(a.moves) > 0:
-                    ## take the next move until a non-colliding location is found
-                    ## For now just take the next move
-                    todo = 3
-                # else:
-                #     ## check if colliding agent has further moves
-                #     ## Not necessary if sort
-                #     b = agents[prev_positions[posX_east, posY]-1]
-                #     if 
+            agentsInClusterLen += 1
+            ## get the next move for an agent and account for costs
+            try:
+                a.dir = a.moves.pop(0)
+                if a.dir != 'q':
+                    totalCost += 1
+                else:
+                    waitCost += 1
+            except IndexError:
+                a.dir = 'q'
+                waitCost += 1
+    
+            if a.getDir() == 'e':
+                east_move = round(a.posX+1*step, 1)
+                a.setXPos(east_move)
+                a.setOrientation(EAST)
+            elif a.getDir() == 'w':
+                west_move = round(a.posX-1*step, 1)
+                a.setXPos(west_move)
+                a.setOrientation(WEST)
+            elif a.getDir() == 's':
+                south_move = round(a.posY-1*step, 1)
+                a.setYPos(south_move)
+                a.setOrientation(SOUTH)
+            elif a.getDir() == 'n':
+                north_move = round(a.posY+1*step, 1)
+                a.setYPos(north_move)
+                a.setOrientation(NORTH)
+            elif a.getDir() == 'q':
+                pass
+            else:
+                raise ValueError("Incorrect direction. ")
+            
+            ## Add the new pos to updated pos_directory
+            if all_pos.get((a.posX, a.posY)):
+                all_pos[(a.posX, a.posY)].append(a.ID)
+            else:
+                all_pos[(a.posX, a.posY)] = [a.ID]
+    
+    ## TODO: Resolve collision - both 1. Intra Cluster 2. Inter Cluster
+    ## Resolve all collisions
+    ## NOTE: Backtracking can cause collisions as well and for trajectory based forward moving this is even bigger
+    ## problem because then we would have to backtrack for mutliple steps
+    ## SOLN: Don't move down trajectory unless completely sure
+    ## TODO: Avoid swap moves as well
+    ## Account for exploring agents which are waiting
+    for a in agents:
+        if len(a.clusterID)==0:
+            a.updateView(r_pos)
+            if len(a.viewTasks) > 0:
+                a.dir = 'q'
+                waitCost += 1
 
-            a.setXPos(east_move)
-            a.setOrientation(EAST)
-            prev_positions[posX_east, posY] = a.ID
-        elif a.getDir() == 'w':
-            west_move = round(a.posX-1*step, 1)
-            posX_west = round(abs(west_move - rstart_x) / step)
-            prev_positions[posX_west, posY]
-            a.setXPos(west_move)
-            a.setOrientation(WEST)
-        elif a.getDir() == 's':
-            south_move = round(a.posY-1*step, 1)
-            posY_south = round(abs(south_move - rstart_y) / step)
-            prev_positions[posX, posY_south]
-            a.setYPos(south_move)
-            a.setOrientation(SOUTH)
-        elif a.getDir() == 'n':
-            north_move = round(a.posY+1*step, 1)
-            posY_north = round(abs(north_move - rstart_y) / step)
-            prev_positions[posX, posY_north]
-            a.setYPos(north_move)
-            a.setOrientation(NORTH)
-        elif a.getDir() == 'q':
-            prev_positions[posX, posY]
-            pass
-        else:
-            raise ValueError("Incorrect direction. ")
+    for a in agents:
+        if len(a.clusterID)==0 and a.dir == 'q':
+            agentsInClusterLen += 1
+            if all_pos.get((a.posX, a.posY)):
+                all_pos[(a.posX, a.posY)].append(a.ID)
+            else:
+                all_pos[(a.posX, a.posY)] = [a.ID]
+
+    while len(all_pos) < agentsInClusterLen:
+        for pos in list(all_pos.keys()):
+            ## check for collisions
+            if len(all_pos[pos]) > 1:
+                print("Colision at Loc:",pos, " for agents", all_pos[pos])
+                colliding_agents_IDs = all_pos[pos]
+                ## Agents which were previously waiting here or its their original position and have back tracked
+                ## vs agents which have moved into this new position and have collided with already residing agents
+                colliding_agents_moved = list(filter(lambda a: a.ID in colliding_agents_IDs and len(a.clusterID) > 0 and (a.dir != 'q' or not a.back), agents))
+                prev_waiting = False
+                if len(colliding_agents_moved) == len(colliding_agents_IDs):
+                    # No previously waiting agents
+                    prev_waiting = False
+                elif len(colliding_agents_moved) == len(colliding_agents_IDs)-1:
+                    # One previously waiting agents
+                    prev_waiting = True
+                else:
+                    raise ValueError("Impossible, two agents cannot be waiting at same location")
+                sorted_agents = sorted(colliding_agents_moved, key=functools.cmp_to_key(movePrecedenceCmp))
+                curr_agnt = None
+                if not prev_waiting:
+                    ## Since no one was waiting the agent to travel farthest will retain its move
+                    curr_agnt = sorted_agents.pop(0)
+                else:
+                    ## Find the currently waiting agent or one who backtracked
+                    curr_agnt = list(filter(lambda a: a.ID in colliding_agents_IDs and (a.dir == 'q' or a.back), agents))[0]
+                assert curr_agnt != None
+                curr_always_waiting = len(curr_agnt.clusterID) == 0 or len([x for x in curr_agnt.moves if x != 'q']) == 0
+                ## Now the current colliding location is filled and who occupies it is fixed
+                ## For everyone else find a safe next location or backtrack
+                for collide_agt in sorted_agents:
+                    if len([x for x in collide_agt.moves if x != 'q']) > 0:
+                        ## Trajectory agent
+                        safe = False
+                        any_future_safe = False ## TODO: use this later to make better waits for travelling agents
+                        trajectory_seen = 0
+                        agent_t_cost = 0
+                        agent_w_cost = 0
+                        agent_pos = pos
+                        agent_orient = collide_agt.orientation
+                        ## keep looking for next safe move until all of trajectory is seen
+                        ## A safe move is one where no one currently is and no one can backtrack as well
+                        while not safe and trajectory_seen < len(collide_agt.moves):
+                            next_move = collide_agt.moves[trajectory_seen]
+                            trajectory_seen += 1
+                            if next_move != 'q':
+                                agent_t_cost += 1
+                            else:
+                                agent_w_cost += 1
+                            
+                            if next_move == 'e':
+                                east_move = round(agent_pos[0]+1*step, 1)
+                                agent_pos = (east_move, agent_pos[1])
+                                agent_orient = EAST
+                            elif next_move == 'w':
+                                west_move = round(agent_pos[0]-1*step, 1)
+                                agent_pos = (west_move, agent_pos[1])
+                                agent_orient = WEST
+                            elif next_move == 's':
+                                south_move = round(agent_pos[1]-1*step, 1)
+                                agent_pos = (agent_pos[0], south_move)
+                                agent_orient = SOUTH
+                            elif next_move == 'n':
+                                north_move = round(agent_pos[1]+1*step, 1)
+                                agent_pos = (agent_pos[0], north_move)
+                                agent_orient = NORTH
+                            elif next_move == 'q':
+                                pass
+                            else:
+                                raise ValueError("Incorrect direction. ")
+                            
+                            if all_pos.get(agent_pos) or prev_pos.get(agent_pos):
+                                ## Not a safe location
+                                ## Check if any the agent in the location will stay there permanently ?
+                                ## if so then just mark it always unsafe
+                                do = 'todo'
+                            else:
+                                ## Found safe then update move, location, trajectory and account for taken move costs
+                                all_pos[agent_pos] = [collide_agt.ID]
+                                all_pos[pos].remove(collide_agt.ID)
+                                totalCost += agent_t_cost
+                                waitCost += agent_w_cost
+                                collide_agt.setXPos(agent_pos[0])
+                                collide_agt.setYPos(agent_pos[1])
+                                collide_agt.dir = next_move
+                                collide_agt.setOrientation(agent_orient)
+                                for _ in range(trajectory_seen):
+                                    collide_agt.moves.pop(0)
+                                safe = True
+                                print("Collision resolution for Agent:", collide_agt.ID, " move to (",collide_agt.posX,",",collide_agt.posY,")")
+                                break
+
+                        ## Still can't find a safe location then backtrack hoping that currently occupying agent
+                        #  or someone from further unsafe location moves
+                        ## TODO: Don't hope just check above if any_future_safe and if so wait temporarily else permanently
+                        if not safe:
+                            ## Backtrack and discount for previously computed costs
+                            collide_agt.moves.insert(0, collide_agt.dir)
+                            collide_agt.back = True
+                            all_pos[pos].remove(collide_agt.ID)
+                            if collide_agt.dir != 'q':
+                                totalCost -= 1
+                            else:
+                                waitCost -= 1
+                            opposite_dir = getOppositeDirection(collide_agt.dir)
+                            if opposite_dir == 'e':
+                                east_move = round(collide_agt.posX+1*step, 1)
+                                collide_agt.setXPos(east_move)
+                                collide_agt.setOrientation(EAST)
+                            elif opposite_dir == 'w':
+                                west_move = round(collide_agt.posX-1*step, 1)
+                                collide_agt.setXPos(west_move)
+                                collide_agt.setOrientation(WEST)
+                            elif opposite_dir == 's':
+                                south_move = round(collide_agt.posY-1*step, 1)
+                                collide_agt.setYPos(south_move)
+                                collide_agt.setOrientation(SOUTH)
+                            elif opposite_dir == 'n':
+                                north_move = round(collide_agt.posY+1*step, 1)
+                                collide_agt.setYPos(north_move)
+                                collide_agt.setOrientation(NORTH)
+                            elif opposite_dir == 'q':
+                                pass
+                            else:
+                                raise ValueError("Incorrect direction. ")
+                            
+                            print("No Collision resolution for Agent:", collide_agt.ID, " backtrack to (",collide_agt.posX,",",collide_agt.posY,") for now")
+
+                            if all_pos.get((collide_agt.posX, collide_agt.posY)):
+                                all_pos[(collide_agt.posX, collide_agt.posY)].append(collide_agt.ID)
+                            else:
+                                all_pos[(collide_agt.posX, collide_agt.posY)] = [collide_agt.ID]
+
+                    else:
+                        ## Final move agent simply backtracks
+                        #  but if current occupying agent is going to wait there indefinitely then backtrack but
+                        #  account for the final move and call it good.
+                        if curr_always_waiting:
+                            ## Just Backtrack
+                            collide_agt.back = True
+                            all_pos[pos].remove(collide_agt.ID)
+                            opposite_dir = getOppositeDirection(collide_agt.dir)
+                            if opposite_dir == 'e':
+                                east_move = round(collide_agt.posX+1*step, 1)
+                                collide_agt.setXPos(east_move)
+                                collide_agt.setOrientation(EAST)
+                            elif opposite_dir == 'w':
+                                west_move = round(collide_agt.posX-1*step, 1)
+                                collide_agt.setXPos(west_move)
+                                collide_agt.setOrientation(WEST)
+                            elif opposite_dir == 's':
+                                south_move = round(collide_agt.posY-1*step, 1)
+                                collide_agt.setYPos(south_move)
+                                collide_agt.setOrientation(SOUTH)
+                            elif opposite_dir == 'n':
+                                north_move = round(collide_agt.posY+1*step, 1)
+                                collide_agt.setYPos(north_move)
+                                collide_agt.setOrientation(NORTH)
+                            elif opposite_dir == 'q':
+                                pass
+                            else:
+                                raise ValueError("Incorrect direction. ")
+                            
+                            print("No Collision resolution for Agent:", collide_agt.ID, " backtrack to (",collide_agt.posX,",",collide_agt.posY,") and stay (final pos)")
+                            ## Since final move only going to wait hence forth
+                            collide_agt.dir = 'q'
+
+                            if all_pos.get((collide_agt.posX, collide_agt.posY)):
+                                all_pos[(collide_agt.posX, collide_agt.posY)].append(collide_agt.ID)
+                            else:
+                                all_pos[(collide_agt.posX, collide_agt.posY)] = [collide_agt.ID]
+
+                        else:
+                            ## Backtrack and discount for previously computed costs
+                            collide_agt.moves.insert(0, collide_agt.dir)
+                            collide_agt.back = True
+                            all_pos[pos].remove(collide_agt.ID)
+                            if collide_agt.dir != 'q':
+                                totalCost -= 1
+                            else:
+                                waitCost -= 1
+                            opposite_dir = getOppositeDirection(collide_agt.dir)
+                            if opposite_dir == 'e':
+                                east_move = round(collide_agt.posX+1*step, 1)
+                                collide_agt.setXPos(east_move)
+                                collide_agt.setOrientation(EAST)
+                            elif opposite_dir == 'w':
+                                west_move = round(collide_agt.posX-1*step, 1)
+                                collide_agt.setXPos(west_move)
+                                collide_agt.setOrientation(WEST)
+                            elif opposite_dir == 's':
+                                south_move = round(collide_agt.posY-1*step, 1)
+                                collide_agt.setYPos(south_move)
+                                collide_agt.setOrientation(SOUTH)
+                            elif opposite_dir == 'n':
+                                north_move = round(collide_agt.posY+1*step, 1)
+                                collide_agt.setYPos(north_move)
+                                collide_agt.setOrientation(NORTH)
+                            elif opposite_dir == 'q':
+                                pass
+                            else:
+                                raise ValueError("Incorrect direction. ")
+                            
+                            print("No Collision resolution for Agent:", collide_agt.ID, " backtrack to (",collide_agt.posX,",",collide_agt.posY,") for now")
+                            if all_pos.get((collide_agt.posX, collide_agt.posY)):
+                                all_pos[(collide_agt.posX, collide_agt.posY)].append(collide_agt.ID)
+                            else:
+                                all_pos[(collide_agt.posX, collide_agt.posY)] = [collide_agt.ID]
+
+    ## Reset all the backtrack flags
+    for a in agents:
+        if len(a.clusterID)!=0:
+            a.back = False
+    
+    ## Append to the all_pos of cluster agents which moved and place previous locations of exploring agents
+    ## except exploring agents which now wait since they have seen a task and whoes locations already exists in all_pos
+    ## in there as well for added prevention of swap moves
+    for a in agents:
+        if len(a.clusterID)==0 and a.dir != 'q':
+            if all_pos.get((a.posX, a.posY)):
+                all_pos[(a.posX, a.posY)].append(a.ID)
+            else:
+                all_pos[(a.posX, a.posY)] = [a.ID]
+
+    for a in agents:
+        if len(a.clusterID)==0:
+            ## Not needed since done above
+            # a.updateView(r_pos)
+            if len(a.viewTasks) == 0:
+                a.dir=getExplorationMove(a, all_pos)
+                if a.dir != 'q':
+                    if verbose == 'x':
+                        print(a.ID, a.dir)
+                    totalCost+=1
+                    explore_steps += 1
+                else:
+                    waitCost += 1
+            
+            if a.getDir() == 'e':
+                east_move = round(a.posX+1*step, 1)
+                a.setXPos(east_move)
+                a.setOrientation(EAST)
+            elif a.getDir() == 'w':
+                west_move = round(a.posX-1*step, 1)
+                a.setXPos(west_move)
+                a.setOrientation(WEST)
+            elif a.getDir() == 's':
+                south_move = round(a.posY-1*step, 1)
+                a.setYPos(south_move)
+                a.setOrientation(SOUTH)
+            elif a.getDir() == 'n':
+                north_move = round(a.posY+1*step, 1)
+                a.setYPos(north_move)
+                a.setOrientation(NORTH)
+            elif a.getDir() == 'q':
+                pass
+            else:
+                raise ValueError("Incorrect direction. ")
+            
+            ## Add the new pos to updated pos_directory
+            if all_pos.get((a.posX, a.posY)):
+                all_pos[(a.posX, a.posY)].append(a.ID)
+            else:
+                all_pos[(a.posX, a.posY)] = [a.ID]
+
+    # for a in agents:
+    #     # if visualizer:
+    #     #     changeCell(a.posX, a.posY, 'blank', 0)
 
         # if visualizer:
         #     changeCell(a.posX, a.posY, 'agent', a.color)
@@ -1094,10 +1366,11 @@ def stateUpdate():
         #     taskVertices.remove((a.posX, a.posY))
 
         sys.stdout.flush()
-    pos = []
-    for a in agents:
-        pos.append([a.posX, a.posY, a.orientation])
-    return np.asarray(pos).T
+    pos = np.zeros((3, A))
+    for idx, a in enumerate(agents):
+        pos[:,idx] = np.asarray([a.posX, a.posY, a.orientation])
+        # pos.append()
+    return pos, totalCost, waitCost, explore_steps
 
 """
 def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable):
@@ -1476,25 +1749,27 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                                         agentPositions, tempTasks, 
                                         {a_ID:agent_pos}, 
                                         waitAgents)
-            # Check if the move is causing a collision and if so then instead append a wait move
-            collision = False
-            if move == 'n':
-                temp_pos = (agent_pos[0],round(agent_pos[1]+step, 1))
-            elif move == 's':
-                temp_pos = (agent_pos[0],round(agent_pos[1]-step, 1))
-            elif move == 'e':
-                temp_pos = (round(agent_pos[0]+step, 1),agent_pos[1])
-            elif move == 'w':
-                temp_pos = (round(agent_pos[0]-step, 1),agent_pos[1])
-            for a_id in prevMoves:
-                if temp_pos == agentPositions[a_id]:
-                    print("Agent: ", a_ID, " colliding with Agent: ", a_id)
-                    move = 'q'
-                    collision = True
-                    if a_id in waitAgents:
-                        waitAgents.append(a_ID)
-                    break
 
+            ## NOTE: Not needed - handled in stateUpdate
+            ## Check if the move is causing a collision and if so then instead append a wait move
+            # collision = False
+            # if move == 'n':
+            #     temp_pos = (agent_pos[0],round(agent_pos[1]+step, 1))
+            # elif move == 's':
+            #     temp_pos = (agent_pos[0],round(agent_pos[1]-step, 1))
+            # elif move == 'e':
+            #     temp_pos = (round(agent_pos[0]+step, 1),agent_pos[1])
+            # elif move == 'w':
+            #     temp_pos = (round(agent_pos[0]-step, 1),agent_pos[1])
+            # for a_id in prevMoves:
+            #     if temp_pos == agentPositions[a_id]:
+            #         print("Agent: ", a_ID, " colliding with Agent: ", a_id)
+            #         move = 'q'
+            #         collision = True
+            #         if a_id in waitAgents:
+            #             waitAgents.append(a_ID)
+            #         break
+            
             prevMoves[a_ID] = move
             allPrevMoves[a_ID].append(move)
             if move == 'n':
@@ -1505,7 +1780,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                 agentPositions[a_ID] = (round(agent_pos[0]+step, 1),agent_pos[1])
             elif move == 'w':
                 agentPositions[a_ID] = (round(agent_pos[0]-step, 1),agent_pos[1])
-            elif move == 'q' and not collision:
+            elif move == 'q':
                 waitAgents.append(a_ID)
                 pass
 
@@ -1794,12 +2069,11 @@ def main():
                         print()
 
                 ## Update colors for centroids...
-                """
                 for a in agents:
                     if len(a.clusterID) > 0 and a.ID == a.clusterID[0]:
                         a.color_prime = colors.pop(0)
                         a.gui_split = True
-                """
+
                 mergeTimelines()
 
                 for i in range(psi):
@@ -1819,7 +2093,7 @@ def main():
                                     a.clusterID_prime.append(x.clusterID[0])
                                     a.parent_prime = x
                                     a.color_prime = x.color
-                                    # a.gui_split = True
+                                    a.gui_split = True
 
                                     if a not in x.children and a != x:
                                         x.children_prime.append(a)
@@ -1857,7 +2131,7 @@ def main():
                             a.message_prime = True
                             a.parent_prime = None ## no parent for centroids...
                             a.color_prime = colors.pop(0)
-                            # a.gui_split = True
+                            a.gui_split = True
 
                             for x in a.viewAgents:
                                 if x.message == False and x != a:
@@ -1865,7 +2139,7 @@ def main():
                                     x.message_prime = True ## now x has received the message about the new centroid...
                                     x.parent_prime = a ## a is the new parent...
                                     x.color_prime = a.color ## get a's color...
-                                    # x.gui_split = True
+                                    x.gui_split = True
 
                                     if x not in a.children:
                                         a.children_prime.append(x)
@@ -1905,11 +2179,9 @@ def main():
 
                         mergeTimelines()
                     ## perform a final visualizer update
-                    """
                     for a in agents:
                         if len(a.clusterID) > 0:
                             a.gui_split = True
-                    """
                     mergeTimelines()
                     if '1' in verbose or verbose == '-1':
                         print("Phase 4.5: ")
@@ -1945,7 +2217,7 @@ def main():
                                         x.message_prime = True
                                         x.parent_prime = a
                                         x.color_prime = a.color
-                                        # x.gui_split = True
+                                        x.gui_split = True
 
                                         if x not in a.children:
                                             a.children_prime.append(x)
@@ -2019,8 +2291,6 @@ def main():
                 Assert that all colors match to clusterID number. 
 
                 """
-                ## TODO: See if color update is required in robotarium
-                """
                 for _ in range(N):
                     for a in agents:
                         if a.parent != None:
@@ -2029,7 +2299,16 @@ def main():
                                 ## only update visualizer if color changes
                                 a.gui_split = True
                     mergeTimelines()
-                """
+
+                r_pos = r_env.get_poses()
+                for i in range(A):
+                    agent = agents[i]
+                    clusterM = 0
+                    if len(agent.getCluster()) > 0:
+                        clusterM = agent.getCluster()[0]
+                    robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
+                r_env.step()
+
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
                     for a in agents:
@@ -2190,7 +2469,7 @@ def main():
                 for agent in agents:
                     agent_pos = {}
                     for a in agent.clusterAgents:
-                        agent_pos[a]=(agents[a-1].posX-agent.clusterAgents[a][0],agents[a-1].posY-agent.clusterAgents[a][1])
+                        agent_pos[a]=(round(agents[a-1].posX-agent.clusterAgents[a][0],1),round(agents[a-1].posY-agent.clusterAgents[a][1],1))
                         cluster = agents[a-1].clusterID[0]
                     try:
                         assert len(set(agent_pos.values()).intersection(set(agent.clusterTasks))) == 0
@@ -2242,10 +2521,13 @@ def main():
                 ## loose upper bound... 
                 # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                 # Sync execution of actions all at once
-                num_iterations = (2**psi)*k
-                for i in range(num_iterations):
+                num_iterations = (2**(psi))*k
+                clusterAgents = [x for x in agents if len(x.clusterID) > 0]
+                iters = 0
+                while len([x for x in clusterAgents if len(x.moves) > 0]) > 0 if len(clusterAgents) > 0 else iters < num_iterations:
+                    iters += 1
                     if '3' in verbose or verbose == '-1':
-                        print("=======Round: {}/{}".format(i, num_iterations))
+                        print("=======Round: {}/{}".format(iters,num_iterations))
                         print(len(taskVertices), totalCost)
                     if 't' in verbose or verbose == '-1':
                         print("Remaining Tasks: ", len(taskVertices))
@@ -2256,35 +2538,8 @@ def main():
                         if a.exp_dist_remaining != 0:
                             a.clusterID = []
 
-                    for a in agents:
-                        ## If still exploring pick a random new move
-                        if len(a.clusterID)==0:
-                            ## Whys do a updateView here ??
-                            a.updateView(r_pos)
-                            if len(a.viewTasks) == 0:
-                                a.dir=getExplorationMove(a)
-                                if a.dir != 'q':
-                                    if verbose == 'x':
-                                        print(a.ID, a.dir)
-                                    totalCost+=1
-                                    explore_steps += 1
-                                else:
-                                    waitCost += 1
-                            else:
-                                a.dir = 'q'
-                                waitCost += 1
-                        ## continue with the move list computed previously ** as oppose to calculating a new move based on parents move
-                        else:
-                            try:
-                                a.dir = a.moves.pop(0)
-                                if a.dir != 'q':
-                                    totalCost += 1
-                                else:
-                                    waitCost += 1
-                            except IndexError:
-                                a.dir = 'q'
-                                waitCost += 1
-                    goal_points = stateUpdate()
+                    ## Let this be done in tandem with the stateUpdate with all the collision resolution
+                    goal_points, totalCost, waitCost, explore_steps = stateUpdate(r_pos, totalCost, waitCost, explore_steps)
 
                     # print(r_pos)
                     # print(goal_points)
@@ -2314,14 +2569,20 @@ def main():
 
                         # Create unicycle control inputs
                         dxu = unicycle_pose_controller(r_pos, goal_points)
+                        ## for position only controller use
+                        # dxu = unicycle_pose_controller(r_pos, goal_points[:2][:])
                         # Create safe control inputs (i.e., no collisions)
                         dxu = uni_barrier_cert(dxu, r_pos)
                         # Set the velocities
                         r_env.set_velocities(np.arange(A), dxu)
                         # Iterate the simulation
                         r_env.step()
-                    
+                    # print("Finished 1 Step of robotarium move")
                     # time.sleep(wait_time)
+                ## Check if there are agents which are still waiting for their trajectory to complete
+                for a in agents:
+                    if len(a.clusterID) > 0 and len(a.moves) > 0:
+                        print("Agent: ", a.ID, " has still ", len(a.moves), " moves to complete")
 
                 for a in agents:
                     a.deallocate()

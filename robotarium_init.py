@@ -176,7 +176,9 @@ def getParameters():
     parser.add_argument('--psi', required=False, default=2)
     # parser.add_argument('--vis', required=False, default=False, action='store_true')
     #24921
-    parser.add_argument('--seed', required=False, default=34321)
+    #34321
+    #72913
+    parser.add_argument('--seed', required=False, default=24921)
     parser.add_argument('--wall_pr', required=False, default=0.2)
     # parser.add_argument('--no_colis', required=False, default=True, action='store_false')
     # parser.add_argument('--exp', required=True, type=int)
