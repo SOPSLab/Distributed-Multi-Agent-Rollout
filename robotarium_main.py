@@ -359,18 +359,19 @@ def dirShortestPath(networkVertices,networkEdges,source,target):
         if u == target:
             S=[]
             if target[0] == 0 and target[1] == 0:
-                t = (0.0, 0.0)
+                t0 = (0.0, 0.0)
             elif target[0] == 0:
-                t = (0.0, target[1])
+                t0 = (0.0, target[1])
             elif target[1] == 0:
-                t = (target[0], 0.0)
+                t0 = (target[0], 0.0)
             else:
-                t = target
+                t0 = target
+            t = t0
             if prev[str(t)] != None or t==source:
                 while t != None:
                     S.append(t)
                     t=prev[str(t)]
-                return dist[str(t)],list(reversed(S))
+                return dist[str(t0)],list(reversed(S))
         for e in networkEdges:
             if e[0]==u:
                 if e[1][0] == 0 and e[1][1] == 0:
@@ -1020,9 +1021,9 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
     agentsInClusterLen = 0
 
     for a in agents:
-        # a.back = False
+        a.back = False
         if len(a.clusterID)!=0:
-            ## Add the new pos to old pos_directory
+            ## Add the pos to old pos_directory
             if prev_pos.get((a.posX, a.posY)):
                 prev_pos[(a.posX, a.posY)].append(a.ID)
             else:
@@ -1097,7 +1098,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
                 colliding_agents_IDs = all_pos[pos]
                 ## Agents which were previously waiting here or its their original position and have back tracked
                 ## vs agents which have moved into this new position and have collided with already residing agents
-                colliding_agents_moved = list(filter(lambda a: a.ID in colliding_agents_IDs and len(a.clusterID) > 0 and (a.dir != 'q' or not a.back), agents))
+                colliding_agents_moved = list(filter(lambda a: a.ID in colliding_agents_IDs and len(a.clusterID) > 0 and (a.dir != 'q' and not a.back), agents))
                 prev_waiting = False
                 if len(colliding_agents_moved) == len(colliding_agents_IDs):
                     # No previously waiting agents
@@ -1160,7 +1161,9 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
                             else:
                                 raise ValueError("Incorrect direction. ")
                             
-                            if all_pos.get(agent_pos) or prev_pos.get(agent_pos):
+                            ## Make sure that it is really unsafe by checking if its currently occupied by someone or
+                            ## is someone else's previous location and not just your own!
+                            if all_pos.get(agent_pos) or (prev_pos.get(agent_pos) and not (collide_agt.ID in prev_pos.get(agent_pos))):
                                 ## Not a safe location
                                 ## Check if any the agent in the location will stay there permanently ?
                                 ## if so then just mark it always unsafe
