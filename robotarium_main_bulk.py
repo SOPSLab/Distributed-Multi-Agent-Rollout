@@ -1,14 +1,14 @@
 import functools
-# import os
+import os
 import sys
 # from tkinter import *
 # from PIL import ImageTk,Image
 import numpy as np
-# import pandas as pd
+import pandas as pd
 import random
 import time
-# import openpyxl
-# import threading
+import openpyxl
+import threading
 import rps.robotarium as robotarium
 from rps.utilities.transformations import *
 from rps.utilities.barrier_certificates import *
@@ -18,6 +18,16 @@ from rps.utilities.graph import *
 
 from robotarium_init import *
 
+#9288012
+#4527271
+#3729391
+#1272922
+#5362782
+#2893817
+#7828172
+#1093802
+#8199829
+#6545288
 # random.seed(12345)
 
 # Direction radians
@@ -47,7 +57,7 @@ size = 9
 step = 0.2
 verbose = '-1'
 
-new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
+new_data = {'Centralized':str(centralized), 'Seed #': str(seed), 'Exp Seed #': str(exp_seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
             '# of Agents': str(A), '# of Tasks': str(numTasks), 'k': str(k),
             'psi': str(psi), 'Only Base Policy': str(only_base_policy)}
@@ -161,7 +171,6 @@ random.seed(exp_seed)
 #         obstacles.append((x,round(y,1)))
 #         obs_dir.append(1)
 
-## Not needed
 # y_obs = [-1.0, 1]
 # for y in y_obs:
 #     for x in np.arange(0.8, -1.0, -0.2):
@@ -814,30 +823,30 @@ for a in agents:
 starting_pos = np.asarray(pos).T
 
 # print(starting_pos)
-r_env = robotarium.Robotarium(number_of_robots=A, show_figure=True, initial_conditions=starting_pos,sim_in_real_time=True)
+r_env = robotarium.Robotarium(number_of_robots=A, show_figure=False, initial_conditions=starting_pos,sim_in_real_time=True)
 
 ## Uncomment below when doing an actual experiment on robotarium with graphics
 
-marker_size_obs = determine_marker_size(r_env, 0.03)
-marker_obs_sml = determine_marker_size(r_env, 0.02)
-marker_size_goal = determine_marker_size(r_env, 0.02)
-marker_size_robot = determine_marker_size(r_env, 0.04)
-taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
-for ii in range(len(taskVertices))]
+# marker_size_obs = determine_marker_size(r_env, 0.03)
+# marker_obs_sml = determine_marker_size(r_env, 0.02)
+# marker_size_goal = determine_marker_size(r_env, 0.02)
+# marker_size_robot = determine_marker_size(r_env, 0.04)
+# taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
+# for ii in range(len(taskVertices))]
 
-horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
-vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
+# horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
+# vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
 
 # square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
 # print(len(obs_dir))
 # print(len(obstacles))
 
-shapes_dir = {
-    0: horizontal_obs,
-    1: vert_obs,
-    2: 's'
-}
+# shapes_dir = {
+#     0: horizontal_obs,
+#     1: vert_obs,
+#     2: 's'
+# }
 # 0 - horizontal
 # 1 - vertical
 # 2 - square
@@ -845,8 +854,9 @@ shapes_dir = {
 # obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_obs_sml if obs_dir[ii] == 2 else marker_size_obs, marker=shapes_dir[obs_dir[ii]], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
 # for ii in range(len(obstacles))]
 
-obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
-for ii in range(len(obstacles))]
+## New obs
+# obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
+# for ii in range(len(obstacles))]
 
 
 robot_markers = []
@@ -1078,9 +1088,9 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
     ## NOTE: Backtracking can cause collisions as well and for trajectory based forward moving this is even bigger
     ## problem because then we would have to backtrack for mutliple steps
     ## SOLN: Don't move down trajectory unless completely sure
-    ## TODO: Avoid swap moves as well
+    ## TODO: Check for deadlocks that can occur: x -> y; y -> x || x    j   y || j is waiting permanently
+    ## this occurs since trajectories don't allow to move into previously occupied location
     ## Account for exploring agents which are waiting
-    ## TODO: Make the all_pos dictonary ordering agnosting
     for a in agents:
         if len(a.clusterID)==0:
             a.updateView(r_pos)
@@ -1102,7 +1112,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
             if len(all_pos[pos]) > 1:
                 print("Colision at Loc:",pos, " for agents", all_pos[pos])
                 colliding_agents_IDs = all_pos[pos]
-                ## Agents which were previously waiting here or its their original position and have back tracked
+                ## Find agents which were previously waiting here or its their original position and have back tracked
                 ## vs agents which have moved into this new position and have collided with already residing agents
                 colliding_agents_moved = list(filter(lambda a: a.ID in colliding_agents_IDs and len(a.clusterID) > 0 and (a.dir != 'q' and not a.back), agents))
                 prev_waiting = False
@@ -1130,7 +1140,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
                     if len([x for x in collide_agt.moves if x != 'q']) > 0:
                         ## Trajectory agent
                         safe = False
-                        any_future_safe = False ## TODO: use this later to make better waits for travelling agents
+                        any_future_safe = False ## used this later to make better waits for travelling agents
                         trajectory_seen = 0
                         agent_t_cost = 0
                         agent_w_cost = 0
@@ -1985,11 +1995,11 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
 def main():
     totalCost = 0
     waitCost = 0
-    # df = pd.DataFrame({'Centralized':[], 'Seed #': [],
-    #                     'Rows': [], 'Cols': [], 'Wall Prob': [],
-    #                     '# of Agents': [], '# of Tasks': [],
-    #                     'k': [], 'psi': [], 'Total Time (s)': [],
-    #                     '# of Exploration': []})
+    df = pd.DataFrame({'Centralized':[], 'Seed #': [], 'Exp Seed #': [],
+                        'Rows': [], 'Cols': [], 'Wall Prob': [],
+                        '# of Agents': [], '# of Tasks': [],
+                        'k': [], 'psi': [], 'Total Time (s)': [],
+                        '# of Exploration': []})
     # lookupTable = offlineTrainRes
 
     if centralized:
@@ -2033,7 +2043,7 @@ def main():
             explore_steps = 0
             r_pos = r_env.get_poses()
 
-            robot_markers = [r_env.axes.scatter(r_pos[0,ii] + 0.05, r_pos[1,ii] + 0.05, s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
+            # robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
 
             r_env.step()
             rounds = 0
@@ -2346,15 +2356,16 @@ def main():
                                 ## only update visualizer if color changes
                                 a.gui_split = True
                     mergeTimelines()
-
-                r_pos = r_env.get_poses()
-                for i in range(A):
-                    agent = agents[i]
-                    clusterM = 0
-                    if len(agent.getCluster()) > 0:
-                        clusterM = agent.getCluster()[0]
-                    robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
-                r_env.step()
+                
+                ## Commented for bulk trials
+                # r_pos = r_env.get_poses()
+                # for i in range(A):
+                #     agent = agents[i]
+                #     clusterM = 0
+                #     if len(agent.getCluster()) > 0:
+                #         clusterM = agent.getCluster()[0]
+                #     robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
+                # r_env.step()
 
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
@@ -2596,10 +2607,10 @@ def main():
                         # Get poses of agents
                         r_pos = r_env.get_poses()
 
-                        for i in range(A):
-                            agent = agents[i]
-                            # Comment this for bulk runs
-                            robot_markers[i].set_offsets(r_pos[:2,i].T + 0.05)
+                        # Comment this for bulk runs
+                        # for i in range(A):
+                        #     agent = agents[i]
+                            # robot_markers[i].set_offsets(r_pos[:2,i].T)
 
                         # Create unicycle control inputs
                         dxu = unicycle_pose_controller(r_pos, goal_points)
@@ -2620,10 +2631,10 @@ def main():
                         if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
                             remove_t.add(t)
                             # Comment this for bulk runs
-                            for ts in taskss:
-                                if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
-                                    ts.set_visible(False)
-                                    break
+                            # for ts in taskss:
+                            #     if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
+                            #         ts.set_visible(False)
+                            #         break
                     for t in remove_t:
                         taskVertices.remove(t)
                     r_env.step()
@@ -2643,11 +2654,11 @@ def main():
                     a.posY_prime = a.posY
 
                 # time.sleep(wait_time)
-                r_pos = r_env.get_poses()
-                for i in range(A):
-                    agent = agents[i]
-                    robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
-                r_env.step()
+                # r_pos = r_env.get_poses()
+                # for i in range(A):
+                #     agent = agents[i]
+                #     robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
+                # r_env.step()
                 sys.stdout.flush()
                 # if visualizer:
                 #     costLabel=Label(root,text='Total Cost: '+str(totalCost))
@@ -2677,25 +2688,25 @@ def main():
      f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
 
     # df = df.append(new_data, ignore_index=True)
-    # df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
-    # # create unique filename...
-    # filename = "./results/exps_" + \
-    #     str(seed) + "_" + str(numTasks) + "_" + \
-    #     str(k) + "_base_" + str(only_base_policy) + ".xlsx"
+    # create unique filename...
+    filename = "./results/exps_" + \
+        str(seed) + "_" + str(numTasks) + "_" + \
+        str(k) + "_exp_seed_"+ str(exp_seed) +"_base_" + str(only_base_policy) + ".xlsx"
 
-    # if os.path.exists(filename) == False:
-    #     with pd.ExcelWriter(filename, mode="w") as writer:
-    #         df.to_excel(writer, index=False)
-    #         print("Creating file: ", filename)
-    # else:
-    #     print("File already exists... ")
+    if os.path.exists(filename) == False:
+        with pd.ExcelWriter(filename, mode="w") as writer:
+            df.to_excel(writer, index=False)
+            print("Creating file: ", filename)
+    else:
+        print("File already exists... ")
 
 #Driver
-# def start():
-#     #print('starting')
-#     t=threading.Thread(target=main)
-#     t.start()
+def start():
+    #print('starting')
+    t=threading.Thread(target=main)
+    t.start()
 
 # if __name__ == "__main__":
 #   main()

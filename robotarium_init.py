@@ -61,12 +61,13 @@ def init_valid_grid(numAgents, numTasks, wall_prob=0.2, seed=1234, colis=False):
     gridGraph = gridGraph.reshape((rows, cols))
 
     ## Uncomment for static obstacles with better graphics in robotarium
-	# gridGraph = np.ones((rows, cols), dtype=int)
+    # gridGraph = np.ones((rows, cols), dtype=int)
 
-	# obs = [(1,1),(1,3),(1,4),(1,5),(1,7),(2,4),(3,1),(3,3),(3,4),(3,5),(3,7),(5,1),(5,2),(5,3),(5,5),(5,6),(5,7),(6,3),(6,5),(7,1),(7,3),(7,5),(7,7)]
-	# obs_dir = [2,0,0,0,2,1,2,0,0,0,2,0,0,0,0,0,0,1,1,2,1,1,2]
+    # obs = [(1,1),(1,3),(1,4),(1,5),(1,7),(2,4),(3,1),(3,3),(3,4),(3,5),(3,7),(5,1),(5,2),(5,3),(5,5),(5,6),(5,7),(6,3),(6,5),(7,1),(7,3),(7,5),(7,7)]
+    # obs_dir = [2,0,0,0,2,1,2,0,0,0,2,0,0,0,0,0,0,1,1,2,1,1,2]
     obs_dir = []
-	# agents = [(2,2),(2,6),(4,1),(4,4),(4,7),(6,1),(6,7),(7,4)]
+    # agents = [(2,2),(2,6),(4,1),(4,4),(4,7),(6,1),(6,7),(7,4)]
+    # agents = [(2,2),(2,6),(4,1),(7,4),(4,7),(6,1),(6,7)]
 
 	# print("Grid Map::")
     # print(gridGraph)
@@ -76,6 +77,8 @@ def init_valid_grid(numAgents, numTasks, wall_prob=0.2, seed=1234, colis=False):
     obstacles = []
     for i in range(rows):
         for j in range(cols):
+            # if (i,j) in obs:
+            #     gridGraph[i][j] = 0
             x_co = round(rstart_x + j*step, 1)
             y_co = round(rstart_y - i*step, 1)
             if gridGraph[i,j] == 1:
@@ -121,6 +124,8 @@ def init_valid_grid(numAgents, numTasks, wall_prob=0.2, seed=1234, colis=False):
         while (not done):
             agent_i = np.random.randint(0, high=rows)
             agent_j = np.random.randint(0, high=cols)
+            # agent_i = agents[i][0]
+            # agent_j = agents[i][1]
 
             ## check if cell is a free...
             if gridGraph[agent_i, agent_j] == 1:
@@ -169,16 +174,36 @@ def getParameters():
     parser = argparse.ArgumentParser()
     # parser.add_argument('--row', required=True)
 	# parser.add_argument('--col', required=True)
-    parser.add_argument('--agt', required=False, default=8)
-    parser.add_argument('--task', required=False, default=20)
+    parser.add_argument('--agt', required=False, default=7)
+    parser.add_argument('--task', required=False, default=14)
     # parser.add_argument('--cent', required=False, default=False, action='store_true')
     parser.add_argument('--k', required=False, default=3)
     parser.add_argument('--psi', required=False, default=2)
     # parser.add_argument('--vis', required=False, default=False, action='store_true')
+    #current 10
     #24921
     #34321
-    #72913
-    parser.add_argument('--seed', required=False, default=24921)
+    #82931
+    #56122
+    #73192
+    #10932
+    #69347
+    #48369
+    #99918
+    #66182
+
+    #18621
+    #17392
+    #29038
+    #36148
+    #47771
+    #52918
+    #62110
+    #73224
+    #82710
+    #91883
+    parser.add_argument('--seed', required=False, default=34321)
+    parser.add_argument('--exp_seed', required=False, default=1272922)
     parser.add_argument('--wall_pr', required=False, default=0.2)
     # parser.add_argument('--no_colis', required=False, default=True, action='store_false')
     # parser.add_argument('--exp', required=True, type=int)
@@ -194,6 +219,7 @@ def getParameters():
     psi = (int)(args.psi)
     # visualizer = (args.vis)
     seed = (int)(args.seed)
+    exp_seed = (int)(args.exp_seed)
     wall_prob = (float)(args.wall_pr)
     # collisions = (args.no_colis)
     # exp_strat = args.exp
@@ -205,9 +231,10 @@ def getParameters():
     	#print("Centralized")
     # else:
     	#print("Decentralized") 
-    return numAgents, numTasks, k, psi, wall_prob, seed, only_base_policy
+    return numAgents, numTasks, k, psi, wall_prob, seed, only_base_policy, exp_seed
 
 
 
 
 
+# init_valid_grid(7, 14, 0.2, 56122, False)
