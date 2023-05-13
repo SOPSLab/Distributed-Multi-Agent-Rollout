@@ -1026,7 +1026,7 @@ def movePrecedenceCmp(agentA, agentB):
     # return 0 if no swap
     # return 1 if swap B before A
 
-def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
+def stateUpdate(r_pos, totalCost, waitCost, explore_steps, tempTasks):
 
     sys.stdout.flush()
     ## First resolve collision between agents in clusters and have them move first
@@ -1094,7 +1094,12 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
     for a in agents:
         if len(a.clusterID)==0:
             a.updateView(r_pos)
-            if len(a.viewTasks) > 0:
+            found = False
+            for vertex in a.viewVertices:
+                if vertex in tempTasks:
+                    found = True
+                    break
+            if found == True:
                 a.dir = 'q'
                 waitCost += 1
 
@@ -1374,7 +1379,12 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
         if len(a.clusterID)==0:
             ## Not needed since done above
             # a.updateView(r_pos)
-            if len(a.viewTasks) == 0:
+            found = False
+            for vertex in a.viewVertices:
+                if vertex in tempTasks:
+                    found = True
+                    break
+            if found == False:
                 a.dir=getExplorationMove(a, all_pos)
                 if a.dir != 'q':
                     if verbose == 'x':
@@ -1592,7 +1602,7 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
     return ret,minCost
 """
 
-def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
+def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent):
     # Change to robotarium coordinates
     for vertex in networkVertices:
         try:
@@ -1630,6 +1640,23 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             tempPositions[agent_ID] = e[1]
             if tempPositions[agent_ID] in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent_ID])
+            
+            flag = False
+            for a_ID in tempPositions:
+                if len(tempCurrentTasks) == 0:
+                    break
+                if flag == True:
+                    dist,path = bfsNearestTask(networkVertices,networkEdges,
+                                                    tempPositions[a_ID],
+                                                    tempCurrentTasks)
+                    assert dist != None
+                    tempPositions[a_ID] = path[1]
+                    cost += 1
+
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                if flag == False:
+                    flag = True if (a_ID == agent_ID) else False
             if '3' in verbose or verbose == '-1' or 'c' in verbose:
                 print("Task List: ", tempCurrentTasks)
 
@@ -1637,30 +1664,29 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                 if '3' in verbose or verbose == '-1':
                     print("\tRemaining Tasks: ", len(tempCurrentTasks))
                 for a_ID in networkAgents:
-                    if a_ID not in waitAgents:
-                        shortestDist = float('inf')
-                        bestNewPos = None
-
-                        assert tempPositions[a_ID] in networkVertices
-                        dist, path = bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
-                        
-                        if dist == None:
-                            """
-                                should only arise if an agent is alone 
-                                in a connected component
-                            """
-                            bestNewPos = tempPositions[a_ID]
-                        else:
-                            bestNewPos = path[1]
-                        if '3' in verbose or verbose == '-1':
-                            print(f"\tAgent {tempPositions[a_ID]} moves " +
-                            f"to {bestNewPos}")
-                        assert bestNewPos != None
-
-                        tempPositions[a_ID] = bestNewPos
-                        cost += 1
-                        if tempPositions[a_ID] in tempCurrentTasks:
-                            tempCurrentTasks.remove(tempPositions[a_ID])
+                    shortestDist = float('inf')
+                    bestNewPos = None
+                    assert tempPositions[a_ID] in networkVertices
+                    dist, path = bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
+                    
+                    if dist == None:
+                        """
+                            should only arise if an agent is alone 
+                            in a connected component
+                        """
+                        bestNewPos = tempPositions[a_ID]
+                    else:
+                        bestNewPos = path[1]
+                    if '3' in verbose or verbose == '-1':
+                        print(f"\tAgent {tempPositions[a_ID]} moves " +
+                        f"to {bestNewPos}")
+                    assert bestNewPos != None
+                    tempPositions[a_ID] = bestNewPos
+                    cost += 1
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                    if len(tempCurrentTasks) == 0:
+                        break
             if '3' in verbose or verbose == '-1':
                 print("\tCost-to-go for EOI: ", cost)
 
@@ -1701,7 +1727,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     assert len(ties) >= 1 ## some move must get finite cost
     if '3' in verbose or verbose == '-1' or 'c' in verbose:
         print(agent_ID, agents[agent_ID-1].posX, agents[agent_ID-1].posY
-            , ties, waitAgents)
+            , ties)
 
     """
     Question: 
@@ -1729,29 +1755,10 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     that makes progress towards this task. 
 
     """
-    if len(ties) == 1:
-        bestMove = ties[0][0]
-    else:
-        found_wait = False
-        for factor in ties:
-            bestMove = factor[0]
-            if factor[0] == agent_pos:
-                found_wait = True
-                break
-        if not found_wait:
-            ## Find the nearest task
-            _, path = bfsNearestTask(networkVertices, networkEdges,
-                                        agent_pos, taskPos)
-            assert path[-1] in taskPos
-            nearestTask = path[-1]
-            euclidean = float('inf')
-            for factor in ties:
-                ## find factor that moves towards task
-                r2_dist = np.sqrt((agent_pos[0]-nearestTask[0])**2 + 
-                                    (agent_pos[1]-nearestTask[1])**2)
-                if r2_dist < euclidean:
-                    euclidean = r2_dist
-                    bestMove = factor[0]
+    for factor in ties:
+        bestMove = factor[0]
+        if factor[0] == agent_pos:
+            break
 
     if bestMove == (round(agent_pos[0]+step, 1),agent_pos[1]):
         ret = 'e'
@@ -1804,8 +1811,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
             else:
                 move,c = multiAgentRollout(networkVertices, networkEdges,
                                         agentPositions, tempTasks, 
-                                        {a_ID:agent_pos}, 
-                                        waitAgents)
+                                        {a_ID:agent_pos})
 
             ## NOTE: Not needed - handled in stateUpdate
             ## Check if the move is causing a collision and if so then instead append a wait move
@@ -2049,6 +2055,7 @@ def main():
             rounds = 0
             COMPLETION_PARAM = 0.0
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
+            cluster_count = 0.0
             while len(taskVertices) > target_completion:
                 # time.sleep(wait_time)
 
@@ -2382,6 +2389,13 @@ def main():
                         print()
                     print()
 
+                unique_clusters = set()
+                for a in agents:
+                    if a.parent == None and len(a.clusterID) != 0:
+                        unique_clusters.add(a.clusterID[0])
+                cluster_count = ((cluster_count*(rounds-1))+ \
+                                len(unique_clusters))/rounds
+
                 """
                 ---------------------------- LMA ----------------------------
                 """
@@ -2580,6 +2594,7 @@ def main():
                 # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                 # Sync execution of actions all at once
                 num_iterations = (2**(psi))*k
+                tempTasks = taskVertices.copy()
                 clusterAgents = [x for x in agents if len(x.clusterID) > 0]
                 iters = 0
                 while len([x for x in clusterAgents if len(x.moves) > 0]) > 0 if len(clusterAgents) > 0 else iters < num_iterations:
@@ -2597,7 +2612,7 @@ def main():
                             a.clusterID = []
 
                     ## Let this be done in tandem with the stateUpdate with all the collision resolution
-                    goal_points, totalCost, waitCost, explore_steps = stateUpdate(r_pos, totalCost, waitCost, explore_steps)
+                    goal_points, totalCost, waitCost, explore_steps = stateUpdate(r_pos, totalCost, waitCost, explore_steps, tempTasks)
 
                     # print(r_pos)
                     # print(goal_points)
@@ -2682,6 +2697,7 @@ def main():
 
     new_data['Total Cost'] = str(totalCost)
     new_data['Total Time (s)'] = str(totalTime)
+    new_data['Average Cluster Count'] = str(cluster_count)
     if verbose == '-1':
         print(new_data)
     print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
