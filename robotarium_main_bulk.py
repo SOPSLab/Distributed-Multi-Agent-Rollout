@@ -2393,8 +2393,9 @@ def main():
                 for a in agents:
                     if a.parent == None and len(a.clusterID) != 0:
                         unique_clusters.add(a.clusterID[0])
-                cluster_count = ((cluster_count*(rounds-1))+ \
-                                len(unique_clusters))/rounds
+                # cluster_count = ((cluster_count*(rounds-1))+ \
+                #                 len(unique_clusters))/rounds
+                cluster_count += len(unique_clusters)
 
                 """
                 ---------------------------- LMA ----------------------------
