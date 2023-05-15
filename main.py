@@ -13,7 +13,7 @@ import threading
 import utils as ut
 from init import getParameters
 
-random.seed(9012)
+#random.seed(9012)
 
 wait_time = 0
 
@@ -24,7 +24,7 @@ rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
 seed, collisions, exp_strat, only_base_policy, pure_greedy, verbose, \
 depots, run_num = getParameters()
 
-if depots: 
+if depots:
     if run_num == 1:
         random.seed(1234)
     elif run_num == 2:
@@ -79,7 +79,7 @@ if visualizer:
         img=ImageTk.PhotoImage(img)
         agentImages.append(img)
 
-    blankLabel=Label(root, text="     ", borderwidth=6, 
+    blankLabel=Label(root, text="     ", borderwidth=6,
                     padx=padding,pady=padding,relief="solid")
 
     # #Add Tasks
@@ -106,7 +106,7 @@ taskVertices = out['task_verts']
 ## truncate task list to accomodate lesser number of tasks
 assert len(taskVertices) >= numTasks
 if len(taskVertices) != numTasks:
-    delete_inds = random.sample(range(len(taskVertices)), 
+    delete_inds = random.sample(range(len(taskVertices)),
                                 len(taskVertices)-numTasks)
     tasks = [taskVertices[i] for i in range(len(taskVertices)) \
                 if i not in delete_inds]
@@ -125,12 +125,12 @@ if visualizer:
     for i in range(rows):
         for j in range(cols):
             if gridGraph[i][j]==0:
-                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, 
+                gridLabels[i][j]=Label(root, text="     ", borderwidth=6,
                     bg='#333366', padx=padding,pady=padding,relief="solid")
                 gridLabels[i][j].grid(row=i,column=j)
 
             else:
-                gridLabels[i][j]=Label(root, text="     ", borderwidth=6, 
+                gridLabels[i][j]=Label(root, text="     ", borderwidth=6,
                     padx=padding,pady=padding,relief="solid")
                 gridLabels[i][j].grid(row=i,column=j)
                 # vertices.append((i,j))
@@ -155,15 +155,15 @@ def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
 
     if cellType=='task':
-        gridLabels[x][y]=Label(image=taskList[0],borderwidth=6, 
+        gridLabels[x][y]=Label(image=taskList[0],borderwidth=6,
             padx=6,pady=4.495,relief="solid")
         gridLabels[x][y].grid(row=r1,column=r2)
     elif cellType=='agent':
-        gridLabels[x][y]=Label(image=agentImages[agentNum-1],borderwidth=6, 
+        gridLabels[x][y]=Label(image=agentImages[agentNum-1],borderwidth=6,
             padx=6,pady=4.495,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
     elif cellType=='blank':
-        gridLabels[x][y]=Label(root, text="     ", borderwidth=6, 
+        gridLabels[x][y]=Label(root, text="     ", borderwidth=6,
             padx=padding,pady=padding,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
 
@@ -633,7 +633,7 @@ def stateUpdate():
 
         sys.stdout.flush()
 
-def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable):
+def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable=None):
     currentPos={}
     for a in agents:
         currentPos[a]=(a.posX,a.posY)
@@ -656,16 +656,13 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
                 currentTasks.remove(currentPos[a])
         else:
             if a != agent:
-                nearest = float('inf')
                 newPos = None
-                for task in currentTasks:
-                    dist,path = lookupTable[str((a.posX,a.posY))][str(task)]
-                    print(dist, dist < nearest)
-                    if dist != None and dist < nearest:
-                        print(dist, nearest)
-                        nearest = dist
-                        newPos = path
-                        print(dist, nearest)
+                dist,path = ut.bfsNearestTask(networkVertices,networkEdges,
+                                                (a.posX,a.posY),currentTasks)
+                if dist != None:
+                    newPos = path[1]
+                else:
+                    newPos = (a.posX,a.posY)
                 assert newPos != None
                 currentPos[a] = newPos
                 if currentPos[a] in currentTasks:
@@ -685,36 +682,39 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
         if e[0]==(agent.posX,agent.posY):
             tempCurrentTasks=currentTasks.copy()
             tempPositions=currentPos.copy()
+
             if e[1] != e[0]:
                 cost=prevCost+1
             else:
-                cost=prevCost ## not a bug!!
-            # cost = prevCost + 1
+                cost=prevCost+0.1
+
             tempPositions[agent]=e[1]
             #print("lookahead edge: ", e)
             if tempPositions[agent]in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent])
             rounds = 0
             while len(tempCurrentTasks)>0:
-                # #print('flag2')
-                # print("POS: ", tempPositions, tempCurrentTasks, cost)
                 for a in agents:
                     shortestDist=float('inf')
                     bestNewPos=None
-                    #assert len(tempCurrentTasks)>0
-                    #print("======== Agent a: {} ========".format((a.posX, a.posY)))
-                    for t in tempCurrentTasks:
-                        try:
-                            #print("PRE:", tempPositions, a.posX, a.posY)
-                            dist,path = (lookupTable[str(tempPositions[a])][str(t)])
-                        except (AssertionError, KeyError):
-                            continue
-                        #dist, path = lookupTable[str(tempPositions[a])][str(t)]
+                    if lookupTable != None:
+                        for t in tempCurrentTasks:
+                            try:
+                                dist,path = (lookupTable[str(tempPositions[a])][str(t)])
+                            except (AssertionError, KeyError):
+                                continue
+                            #dist, path = lookupTable[str(tempPositions[a])][str(t)]
 
-                        # #print("\tPath: {}; Dist: {}".format(path, dist))
-                        if dist<shortestDist:
-                            shortestDist=dist
-                            bestNewPos=path
+                            # #print("\tPath: {}; Dist: {}".format(path, dist))
+                            if dist!=None and dist<shortestDist:
+                                shortestDist=dist
+                                bestNewPos=path
+                    else:
+                        dist, path = ut.bfsNearestTask(networkVertices, networkEdges,
+                                                        tempPositions[a], tempCurrentTasks)
+                        if dist != None:
+                            shortestDist = dist
+                            bestNewPos = path[1]
                     if bestNewPos != None:
                         tempPositions[a]=bestNewPos
                         cost += 1
@@ -723,17 +723,10 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
                     rounds += 1
                     if len(tempCurrentTasks)==0:
                         break
-            #print("resulting cost for action {}: {} ".format((e[0],e[1]), cost))
-            #print(e[1], cost)
             if cost<minCost:
                 minCost=cost
                 bestMove=e[1]
-                if bestMove == e[0]:
-                    print("Waiting! ")
-                    # elif cost==minCost:
-            #    r=random.random()
-            #   if r<0.5:
-            #      bestMove=e[1]
+
             Qfactors.append((e[1],cost))
             del tempPositions
             del tempCurrentTasks
@@ -744,55 +737,28 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
         if factor[1] < minQ:
             minQ = factor[1]
 
-    print(agent.posX, agent.posY, Qfactors)
-    ## collect all ties...
-    wait_ind = None
     ties = []
-
     for factor in Qfactors:
         if factor[1] == minQ:
-            if factor[0]==(agent.posX+1,agent.posY):
-                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('e') != agent.prev_move):
-                    ties.append((factor,'e'))
-            elif factor[0]==(agent.posX-1,agent.posY):
-                if ((agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('w') != agent.prev_move)):
-                    ties.append((factor,'w'))
-            elif factor[0]==(agent.posX,agent.posY+1):
-                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('s') != agent.prev_move):
-                    ties.append((factor,'s'))
-            elif factor[0]==(agent.posX,agent.posY-1):
-                if (agent.prev_move == None) or (agent.prev_move != None and getOppositeDirection('n') != agent.prev_move):
-                    ties.append((factor,'n'))
-            elif factor[0]==(agent.posX,agent.posY):
-                ties.append((factor,'q'))
+            ties.append(factor)
 
-    if len(ties) == 0:
-        for factor in Qfactors:
-            if factor[1] == minQ:
-                if factor[0]==(agent.posX+1,agent.posY):
-                    ties.append((factor,'e'))
-                elif factor[0]==(agent.posX-1,agent.posY):
-                    ties.append((factor,'w'))
-                elif factor[0]==(agent.posX,agent.posY+1):
-                    ties.append((factor,'n'))
-                elif factor[0]==(agent.posX,agent.posY-1):
-                    ties.append((factor,'s'))
-                elif factor[0]==(agent.posX,agent.posY):
-                    ties.append(factor,'q')
+    for factor in ties:
+        bestMove = factor[0]
+        if factor[0] == (agent.posX,agent.posY):
+            break
 
-    bestMove = ties[0][0][0]
+    if bestMove == (agent.posX+1,agent.posY):
+        ret = 'e'
+    elif bestMove == (agent.posX-1,agent.posY):
+        ret = 'w'
+    elif bestMove == (agent.posX,agent.posY+1):
+        ret = 'n'
+    elif bestMove == (agent.posX,agent.posY-1):
+        ret = 's'
+    elif bestMove == (agent.posX,agent.posY):
+        ret = 'q'
 
-    if bestMove==(agent.posX+1,agent.posY):
-        ret= 'e'
-    elif bestMove==(agent.posX-1,agent.posY):
-        ret= 'w'
-    elif bestMove==(agent.posX,agent.posY+1):
-        ret= 'n'
-    elif bestMove==(agent.posX,agent.posY-1):
-        ret= 's'
-    elif bestMove==(agent.posX,agent.posY):
-        ret= 'q'
-    return ret,minCost
+    return ret, minCost
 
 def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent):
     for vertex in networkVertices:
@@ -863,10 +829,10 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
 
                     assert tempPositions[a_ID] in networkVertices
                     dist, path = ut.bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
-                    
+
                     if dist == None:
                         """
-                            should only arise if an agent is alone 
+                            should only arise if an agent is alone
                             in a connected component
                         """
                         bestNewPos = tempPositions[a_ID]
@@ -894,7 +860,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             del tempPositions
             del tempCurrentTasks
 
-    assert bestMove != None     ## should at least wait... 
+    assert bestMove != None     ## should at least wait...
 
     minQ = float('inf')
     for factor in Qfactors:
@@ -902,14 +868,14 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             minQ = factor[1]
 
     """
-    Note: 
+    Note:
     ---------------------------
 
     Not asserting that agents not move back to previous positions
     as we know that there can be oscillations of larger periods and
-    we can't check all possible periods. 
+    we can't check all possible periods.
 
-    Oscillations should implicitly not occur. 
+    Oscillations should implicitly not occur.
 
     """
 
@@ -925,20 +891,20 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             , ties)
 
     """
-    Question: 
+    Question:
     ---------------------------
 
     If we don't break ties randomly, then why bother creating a
-    list of ties and selecting the i-th  Qfactor (for some i)? 
+    list of ties and selecting the i-th  Qfactor (for some i)?
 
     """
 
     """
-    Note: 
+    Note:
     ---------------------------
 
-    Breaking ties by picking the wait-move if possible, 
-    otherwise pick the last move in the ties list. 
+    Breaking ties by picking the wait-move if possible,
+    otherwise pick the last move in the ties list.
 
     """
     for factor in ties:
@@ -986,15 +952,15 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                             in tempTasks]
                 global_temp_pos = (agentPositions[a_ID][0]+x_offset,
                                     agentPositions[a_ID][1]+y_offset)
-                move,c = getClosestClusterTask(agent_pos=agentPositions[a_ID], 
-                                                taskList=tempTasks, 
+                move,c = getClosestClusterTask(agent_pos=agentPositions[a_ID],
+                                                taskList=tempTasks,
                                                 lookupTable=None,
                                                 vertices=networkVertices,
                                                 edges=networkEdges)
             else:
                 move,c = multiAgentRollout(networkVertices, networkEdges,
-                                        agentPositions, tempTasks, 
-                                        {a_ID:agent_pos}, 
+                                        agentPositions, tempTasks,
+                                        {a_ID:agent_pos},
                                         )
             prevMoves[a_ID] = move
             allPrevMoves[a_ID].append(move)
@@ -1029,21 +995,21 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
         print("allPrevMoves: ", allPrevMoves)
 
     """
-    If we are using depots to return to, then we need to 
-    route all agents back to the original position of the 
-    leader agent. 
+    If we are using depots to return to, then we need to
+    route all agents back to the original position of the
+    leader agent.
 
     Note that the original position of the leader is simply
-    the tuple (0,0) in the local view. 
+    the tuple (0,0) in the local view.
 
     """
     if depots:
         for a_ID in agentPositions:
             while agentPositions[a_ID] != (0,0):
                 dist,path = ut.dirShortestPath(networkVertices, networkEdges,
-                                            agentPositions[a_ID], 
+                                            agentPositions[a_ID],
                                             (0,0))
-                assert dist != None 
+                assert dist != None
                 newPos = path[1]
                 if newPos == (agentPositions[a_ID][0],agentPositions[a_ID][1]+1):
                     allPrevMoves[a_ID].append('n')
@@ -1061,7 +1027,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
                     allPrevMoves[a_ID].append('w')
                     agentPositions[a_ID] = (agentPositions[a_ID][0]-1,
                                             agentPositions[a_ID][1])
-                else: 
+                else:
                     raise ValueError("Agent needs to move.")
 
     return allPrevMoves
@@ -1124,7 +1090,7 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
         if lookupTable != None:
             dist, path = lookupTable[str((agent_posX, agent_posY))][str(task)]
         else:
-            dist, path = ut.dirShortestPath(kwargs['vertices'], 
+            dist, path = ut.dirShortestPath(kwargs['vertices'],
                                             kwargs['edges'],
                                             agent_pos, task)
         if dist != None and dist < min_dist:
@@ -1138,7 +1104,7 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
         next_dir = 's'
     elif best_move == (agent_posX, agent_posY+1):
         next_dir = 'n'
-    elif best_move == None: ## isolated agents... 
+    elif best_move == None: ## isolated agents...
         next_dir = 'q'
     else:
         raise ValueError("Best Move is not a move. ")
@@ -1166,7 +1132,7 @@ def main():
                 else:
                     move, c = multiAgentRolloutCent(vertices, adjList, agents,
                                                     taskVertices, a, moves,
-                                                    lookupTable)
+                                                    lookupTable=None)
                 moves[a] = move
                 a.move(move)
 
@@ -1222,7 +1188,7 @@ def main():
                         a.eta_prime += len(a.viewTasks_prime)
 
                     """
-                    Begin Phase 2: 
+                    Begin Phase 2:
                     ----------------------------
 
                     For each agent a in agents that can see a task, search a's view for another agent that is already part of a cluster.
@@ -1266,7 +1232,7 @@ def main():
                     if '1' in verbose or verbose == '-1':
                             print("Phase RR: ")
                             for a in agents:
-                                print(a.ID, a.posX, a.posY, 
+                                print(a.ID, a.posX, a.posY,
                                     a.color, a.clusterID, end=" ")
                                 if a.parent != None:
                                     print(a.parent.ID)
@@ -1291,7 +1257,7 @@ def main():
                         Begin Phase 3:
                         ----------------------------
 
-                        For each agent a that does not belong to any cluster, 
+                        For each agent a that does not belong to any cluster,
                         search its view for agents that are already in a cluster
                         and add a to be their children/join their cluster.
 
@@ -1312,7 +1278,7 @@ def main():
                         if '1' in verbose or verbose == '-1':
                             print("Phase 3: ")
                             for a in agents:
-                                print(a.ID, a.posX, a.posY, 
+                                print(a.ID, a.posX, a.posY,
                                     a.color, a.clusterID, end=" ")
                                 if a.parent != None:
                                     print(a.parent.ID)
@@ -1359,7 +1325,7 @@ def main():
                         if '1' in verbose or verbose == '-1':
                             print("Phase 4: ")
                             for a in agents:
-                                print(a.ID, a.posX, a.posY, 
+                                print(a.ID, a.posX, a.posY,
                                     a.color, a.clusterID, end=" ")
                                 if a.parent != None:
                                     print(a.parent.ID)
@@ -1369,7 +1335,7 @@ def main():
                                 for b in a.children:
                                     print(b.ID, end=" ")
                                 print()
-                            print()                    
+                            print()
 
                         """
                         Begin Phase 4.5:
@@ -1396,7 +1362,7 @@ def main():
                         if '1' in verbose or verbose == '-1':
                             print("Phase 4.5: ")
                             for a in agents:
-                                print(a.ID, a.posX, a.posY, 
+                                print(a.ID, a.posX, a.posY,
                                     a.color, a.clusterID, end=" ")
                                 if a.parent != None:
                                     print(a.parent.ID)
@@ -1414,7 +1380,7 @@ def main():
                             Begin Phase 5:
                             ----------------------------
 
-                            Transfer the message that a new cluster has been 
+                            Transfer the message that a new cluster has been
                             formed to all children of agents within the super
                             cluster's centroid view using the message flag.
 
@@ -1438,7 +1404,7 @@ def main():
                     if '1' in verbose or verbose == '-1':
                         print("Phase 5: ")
                         for a in agents:
-                            print(a.ID, a.posX, a.posY, 
+                            print(a.ID, a.posX, a.posY,
                                 a.color, a.clusterID, end=" ")
                             if a.parent != None:
                                 print(a.parent.ID)
@@ -1461,17 +1427,17 @@ def main():
                         a.message = False
 
                     """
-                    Begin Phase 7: 
+                    Begin Phase 7:
                     ----------------------------
 
-                    Remove any stray children. 
+                    Remove any stray children.
 
                     """
                     for a in agents:
                         if a.parent != None and len(a.clusterID) > 0:
                             for b in a.viewAgents:
-                                if b != a and b != a.parent: 
-                                    if a in b.children: 
+                                if b != a and b != a.parent:
+                                    if a in b.children:
                                         b.children.remove(a)
 
                     time.sleep(wait_time)
@@ -1479,7 +1445,7 @@ def main():
                     if '1' in verbose or verbose == '-1':
                         print("Phase 7: ")
                         for a in agents:
-                            print(a.ID, a.posX, a.posY, 
+                            print(a.ID, a.posX, a.posY,
                                 a.color, a.clusterID, end=" ")
                             if a.parent != None:
                                 print(a.parent.ID)
@@ -1492,13 +1458,13 @@ def main():
                         print()
 
                     """
-                    Begin Phase 8: 
+                    Begin Phase 8:
                     ----------------------------
 
-                    !!! This phase should not be necessary if everything 
+                    !!! This phase should not be necessary if everything
                         above works correctly. (Right?)
 
-                    Assert that all colors match to clusterID number. 
+                    Assert that all colors match to clusterID number.
 
                     """
                     for _ in range(N):
@@ -1513,7 +1479,7 @@ def main():
                     if '1' in verbose or verbose == '-1':
                         print("End of SOAC... ")
                         for a in agents:
-                            print(a.ID, a.posX, a.posY, 
+                            print(a.ID, a.posX, a.posY,
                                 a.color, a.clusterID, end=" ")
                             if a.parent != None:
                                 print(a.parent.ID)
@@ -1529,8 +1495,10 @@ def main():
                     for a in agents:
                         if a.parent == None and len(a.clusterID) != 0:
                             unique_clusters.add(a.clusterID[0])
-                    cluster_count = ((cluster_count*(rounds-1))+ \
-                                    len(unique_clusters))/rounds
+                    #cluster_count = ((cluster_count*(rounds-1))+ \
+                    #                len(unique_clusters))/rounds
+                    cluster_count += len(unique_clusters)
+                    print(cluster_count)
 
                     """
                     ---------------------------- LMA ----------------------------
@@ -1542,7 +1510,7 @@ def main():
                         a.message = False # turn off message flag
 
                     """
-                    Begin Phase 0.5: 
+                    Begin Phase 0.5:
                     ----------------------------
 
                     Offset passing within a cluster before map sharing.
@@ -1557,7 +1525,7 @@ def main():
                         for a in agents:
                             if a.message == True:
                                 for b in a.children:
-                                    if b.message == False: 
+                                    if b.message == False:
                                         b.xOffset = a.xOffset
                                         b.yOffset = a.yOffset
                                         b.message = True
@@ -1565,12 +1533,12 @@ def main():
                         a.message = False
 
                     """
-                    Begin Phase 1: 
+                    Begin Phase 1:
                     ----------------------------
 
-                    Obtain mapOffset values and adjust local view for 
+                    Obtain mapOffset values and adjust local view for
                     leader agents. Begin map sharing with children of
-                    all leader agents. 
+                    all leader agents.
 
                     """
                     for a in agents:
@@ -1602,15 +1570,15 @@ def main():
                                 b.clusterVertices=b.clusterVertices.union(a.clusterVertices)
                                 b.clusterEdges=b.clusterEdges.union(a.clusterEdges)
                                 b.clusterTasks=b.clusterTasks.union(a.clusterTasks)
-                                b.clusterAgents={**b.clusterAgents, 
+                                b.clusterAgents={**b.clusterAgents,
                                                     **a.clusterAgents}
                             a.message=True
 
                     """
-                    Begin Phase 2: 
+                    Begin Phase 2:
                     ----------------------------
 
-                    Map sharing with all agents in the cluster. 
+                    Map sharing with all agents in the cluster.
 
                     """
                     for i in range(N):
@@ -1649,7 +1617,7 @@ def main():
                                     b.clusterVertices=b.clusterVertices.union(a.clusterVertices)
                                     b.clusterEdges=b.clusterEdges.union(a.clusterEdges)
                                     b.clusterTasks=b.clusterTasks.union(a.clusterTasks)
-                                    b.clusterAgents={**b.clusterAgents, 
+                                    b.clusterAgents={**b.clusterAgents,
                                                         **(a.clusterAgents)}
 
                                 a.message=True
@@ -1658,10 +1626,10 @@ def main():
                                     a.parent.message=False
 
                     """
-                    Begin Phase 3: 
+                    Begin Phase 3:
                     ----------------------------
 
-                    Propogate map information back to leader. 
+                    Propogate map information back to leader.
 
                     """
                     for i in range(N):
@@ -1670,7 +1638,7 @@ def main():
                                 a.parent.clusterVertices=a.parent.clusterVertices.union(a.clusterVertices)
                                 a.parent.clusterEdges=a.parent.clusterEdges.union(a.clusterEdges)
                                 a.parent.clusterTasks=a.parent.clusterTasks.union(a.clusterTasks)
-                                a.parent.clusterAgents={**a.parent.clusterAgents, 
+                                a.parent.clusterAgents={**a.parent.clusterAgents,
                                                         **(a.clusterAgents)}
 
                     ## Known error check
@@ -1683,10 +1651,10 @@ def main():
                             assert len(set(agent_pos.values()).intersection(set(agent.clusterTasks))) == 0
                         except AssertionError:
                             task_list = list(agent.clusterTasks)
-                            task_list = [(agents[cluster-1].posX+task[0], 
+                            task_list = [(agents[cluster-1].posX+task[0],
                                         agents[cluster-1].posY+task[1]) for task in task_list]
                             if '2' in verbose or verbose == '-1':
-                                print(agent_pos, agent.clusterTasks, 
+                                print(agent_pos, agent.clusterTasks,
                                         set(agent_pos.values()).intersection(set(agent.clusterTasks)), set(task_list).intersection(set(taskVertices)))
                             raise AssertionError
 
@@ -1699,7 +1667,7 @@ def main():
                     for a in agents:
                         if a.parent==None and len(a.clusterID)>0:
                             agent = {a.ID: a.clusterAgents[a.ID]}
-                            clusterMoves[a.ID] = clusterMultiAgentRollout(a.ID, 
+                            clusterMoves[a.ID] = clusterMultiAgentRollout(a.ID,
                                                                 list(a.clusterVertices),
                                                                 list(a.clusterEdges),
                                                                 a.clusterAgents,
@@ -1726,7 +1694,7 @@ def main():
                                         b.moves = clusterMoves[b.clusterID[0]][b.ID]
                                         b.message = True
 
-                    ## loose upper bound... 
+                    ## loose upper bound...
                     # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                     num_iterations = (2**psi)*k
                     # num_iterations = 2
@@ -1780,7 +1748,7 @@ def main():
                     for a in agents:
                         ## find move to the closest task in local view
                         dist, path = ut.bfsNearestTask(a.viewVertices,
-                                                        a.viewEdges, 
+                                                        a.viewEdges,
                                                         (a.posX,a.posY),
                                                         a.viewTasks)
                         if dist is None:

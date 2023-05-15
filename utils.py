@@ -193,6 +193,7 @@ def bfShortestPath(networkVertices, networkEdges, source, target):
                     labels[str(edge[1])] = True
                     prev[str(edge[1])] = v
                     Q.append(edge[1])
+    return None, None
 
 def bfsFindAgents(networkVertices, networkEdges, source, agentVertices):
     Q = []
