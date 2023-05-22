@@ -1,14 +1,16 @@
 import functools
-# import os
 import sys
 # from tkinter import *
 # from PIL import ImageTk,Image
 import numpy as np
-# import pandas as pd
 import random
 import time
-# import openpyxl
-# import threading
+## Not required for the physical runs
+import os
+import pandas as pd
+import openpyxl
+import threading
+## ----------------------------------
 import rps.robotarium as robotarium
 from rps.utilities.transformations import *
 from rps.utilities.barrier_certificates import *
@@ -47,7 +49,7 @@ size = 9
 step = 0.2
 verbose = '-1'
 
-new_data = {'Centralized':str(centralized), 'Seed #': str(seed),
+new_data = {'Centralized':str(centralized), 'Seed #': str(seed), 'Exp Seed #': str(exp_seed),
             'Rows': str(rows), 'Cols': str(cols), 'Wall Prob': str(wall_prob),
             '# of Agents': str(A), '# of Tasks': str(numTasks), 'k': str(k),
             'psi': str(psi), 'Only Base Policy': str(only_base_policy)}
@@ -813,31 +815,31 @@ for a in agents:
 
 starting_pos = np.asarray(pos).T
 
-# print(starting_pos)
-r_env = robotarium.Robotarium(number_of_robots=A, show_figure=True, initial_conditions=starting_pos,sim_in_real_time=True)
+# show_figure = True for physical simulation verification
+r_env = robotarium.Robotarium(number_of_robots=A, show_figure=False, initial_conditions=starting_pos,sim_in_real_time=True)
 
 ## Uncomment below when doing an actual experiment on robotarium with graphics
 
-marker_size_obs = determine_marker_size(r_env, 0.03)
-marker_obs_sml = determine_marker_size(r_env, 0.02)
-marker_size_goal = determine_marker_size(r_env, 0.02)
-marker_size_robot = determine_marker_size(r_env, 0.04)
-taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
-for ii in range(len(taskVertices))]
+# marker_size_obs = determine_marker_size(r_env, 0.03)
+# marker_obs_sml = determine_marker_size(r_env, 0.02)
+# marker_size_goal = determine_marker_size(r_env, 0.02)
+# marker_size_robot = determine_marker_size(r_env, 0.04)
+# taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
+# for ii in range(len(taskVertices))]
 
-horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
-vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
+# horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
+# vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
 
 # square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
 # print(len(obs_dir))
 # print(len(obstacles))
 
-shapes_dir = {
-    0: horizontal_obs,
-    1: vert_obs,
-    2: 's'
-}
+# shapes_dir = {
+#     0: horizontal_obs,
+#     1: vert_obs,
+#     2: 's'
+# }
 # 0 - horizontal
 # 1 - vertical
 # 2 - square
@@ -845,25 +847,20 @@ shapes_dir = {
 # obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_obs_sml if obs_dir[ii] == 2 else marker_size_obs, marker=shapes_dir[obs_dir[ii]], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
 # for ii in range(len(obstacles))]
 
-obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
-for ii in range(len(obstacles))]
+## New obs
+# obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
+# for ii in range(len(obstacles))]
 
 
 robot_markers = []
 
-# unicycle_pose_controller = my_controller2(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
-# unicycle_pose_controller = create_clf_unicycle_pose_controller()
 ##og
 # unicycle_pose_controller = create_hybrid_unicycle_pose_controller(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
 ## take it slow there are still some collisions occuring for linear_velocity_gain = 0.3
 unicycle_pose_controller = create_hybrid_unicycle_pose_controller(0.3, 0.3, 0.2, np.pi, 0.05, 0.03, 0.01)
-# unicycle_pose_controller = create_hybrid_unicycle_pose_controller()
-# unicycle_pose_controller = create_clf_unicycle_position_controller(linear_velocity_gain=0.5, angular_velocity_gain=1)
 
 # Create barrier certificates to avoid collision
 uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.12, 0.01, 0.2)
-# uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.15, 0.05, 0.2)
-# uni_barrier_cert = create_unicycle_barrier_certificate()
 
 def getOppositeDirection(direction):
     if direction == 'n':
@@ -951,13 +948,6 @@ def getExplorationMove(agent, updated_pos):
 def getLegalMovesFrom(agent, updated_pos):
     # Guard against potential collision
     moves = ['q']
-    ## NOTNEEDED: all the agents in the view and ones which have moved before
-    ## use updated_pos instead of a.viewAgents since that is outdated
-    # filtered = [x for x in a.viewAgents if x.ID < agent.ID]
-    # filtered_pos = []
-    # for n in filtered:
-    #     filtered_pos.append((n.posX, n.posY))
-    ## TODO: Rewrite this copy pasted crap, this is not right, why are there 2 hops ?
     up = round(agent.posY+1*step, 1)
     down = round(agent.posY-1*step, 1)
     left = round(agent.posX-1*step, 1)
@@ -1016,7 +1006,7 @@ def movePrecedenceCmp(agentA, agentB):
     # return 0 if no swap
     # return 1 if swap B before A
 
-def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
+def stateUpdate(r_pos, totalCost, waitCost, explore_steps, tempTasks):
 
     sys.stdout.flush()
     ## First resolve collision between agents in clusters and have them move first
@@ -1073,18 +1063,23 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
             else:
                 all_pos[(a.posX, a.posY)] = [a.ID]
     
-    ## TODO: Resolve collision - both 1. Intra Cluster 2. Inter Cluster
+    ## Resolve collision - both 1. Intra Cluster 2. Inter Cluster
     ## Resolve all collisions
     ## NOTE: Backtracking can cause collisions as well and for trajectory based forward moving this is even bigger
     ## problem because then we would have to backtrack for mutliple steps
     ## SOLN: Don't move down trajectory unless completely sure
-    ## TODO: Avoid swap moves as well
+    ## TODO: Check for deadlocks that can occur: x -> y; y -> x || x    j   y || j is waiting permanently
+    ## this occurs since trajectories don't allow to move into previously occupied location
     ## Account for exploring agents which are waiting
-    ## TODO: Make the all_pos dictonary ordering agnosting
     for a in agents:
         if len(a.clusterID)==0:
             a.updateView(r_pos)
-            if len(a.viewTasks) > 0:
+            found = False
+            for vertex in a.viewVertices:
+                if vertex in tempTasks:
+                    found = True
+                    break
+            if found == True:
                 a.dir = 'q'
                 waitCost += 1
 
@@ -1102,7 +1097,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
             if len(all_pos[pos]) > 1:
                 print("Colision at Loc:",pos, " for agents", all_pos[pos])
                 colliding_agents_IDs = all_pos[pos]
-                ## Agents which were previously waiting here or its their original position and have back tracked
+                ## Find agents which were previously waiting here or its their original position and have back tracked
                 ## vs agents which have moved into this new position and have collided with already residing agents
                 colliding_agents_moved = list(filter(lambda a: a.ID in colliding_agents_IDs and len(a.clusterID) > 0 and (a.dir != 'q' and not a.back), agents))
                 prev_waiting = False
@@ -1130,7 +1125,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
                     if len([x for x in collide_agt.moves if x != 'q']) > 0:
                         ## Trajectory agent
                         safe = False
-                        any_future_safe = False ## TODO: use this later to make better waits for travelling agents
+                        any_future_safe = False ## used this later to make better waits for travelling agents
                         trajectory_seen = 0
                         agent_t_cost = 0
                         agent_w_cost = 0
@@ -1364,7 +1359,12 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps):
         if len(a.clusterID)==0:
             ## Not needed since done above
             # a.updateView(r_pos)
-            if len(a.viewTasks) == 0:
+            found = False
+            for vertex in a.viewVertices:
+                if vertex in tempTasks:
+                    found = True
+                    break
+            if found == False:
                 a.dir=getExplorationMove(a, all_pos)
                 if a.dir != 'q':
                     if verbose == 'x':
@@ -1582,7 +1582,7 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
     return ret,minCost
 """
 
-def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent, waitAgents):
+def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent):
     # Change to robotarium coordinates
     for vertex in networkVertices:
         try:
@@ -1620,6 +1620,23 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             tempPositions[agent_ID] = e[1]
             if tempPositions[agent_ID] in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent_ID])
+            
+            flag = False
+            for a_ID in tempPositions:
+                if len(tempCurrentTasks) == 0:
+                    break
+                if flag == True:
+                    dist,path = bfsNearestTask(networkVertices,networkEdges,
+                                                    tempPositions[a_ID],
+                                                    tempCurrentTasks)
+                    assert dist != None
+                    tempPositions[a_ID] = path[1]
+                    cost += 1
+
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                if flag == False:
+                    flag = True if (a_ID == agent_ID) else False
             if '3' in verbose or verbose == '-1' or 'c' in verbose:
                 print("Task List: ", tempCurrentTasks)
 
@@ -1627,30 +1644,29 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                 if '3' in verbose or verbose == '-1':
                     print("\tRemaining Tasks: ", len(tempCurrentTasks))
                 for a_ID in networkAgents:
-                    if a_ID not in waitAgents:
-                        shortestDist = float('inf')
-                        bestNewPos = None
-
-                        assert tempPositions[a_ID] in networkVertices
-                        dist, path = bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
-                        
-                        if dist == None:
-                            """
-                                should only arise if an agent is alone 
-                                in a connected component
-                            """
-                            bestNewPos = tempPositions[a_ID]
-                        else:
-                            bestNewPos = path[1]
-                        if '3' in verbose or verbose == '-1':
-                            print(f"\tAgent {tempPositions[a_ID]} moves " +
-                            f"to {bestNewPos}")
-                        assert bestNewPos != None
-
-                        tempPositions[a_ID] = bestNewPos
-                        cost += 1
-                        if tempPositions[a_ID] in tempCurrentTasks:
-                            tempCurrentTasks.remove(tempPositions[a_ID])
+                    shortestDist = float('inf')
+                    bestNewPos = None
+                    assert tempPositions[a_ID] in networkVertices
+                    dist, path = bfsNearestTask(networkVertices, networkEdges, tempPositions[a_ID], tempCurrentTasks)
+                    
+                    if dist == None:
+                        """
+                            should only arise if an agent is alone 
+                            in a connected component
+                        """
+                        bestNewPos = tempPositions[a_ID]
+                    else:
+                        bestNewPos = path[1]
+                    if '3' in verbose or verbose == '-1':
+                        print(f"\tAgent {tempPositions[a_ID]} moves " +
+                        f"to {bestNewPos}")
+                    assert bestNewPos != None
+                    tempPositions[a_ID] = bestNewPos
+                    cost += 1
+                    if tempPositions[a_ID] in tempCurrentTasks:
+                        tempCurrentTasks.remove(tempPositions[a_ID])
+                    if len(tempCurrentTasks) == 0:
+                        break
             if '3' in verbose or verbose == '-1':
                 print("\tCost-to-go for EOI: ", cost)
 
@@ -1691,7 +1707,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     assert len(ties) >= 1 ## some move must get finite cost
     if '3' in verbose or verbose == '-1' or 'c' in verbose:
         print(agent_ID, agents[agent_ID-1].posX, agents[agent_ID-1].posY
-            , ties, waitAgents)
+            , ties)
 
     """
     Question: 
@@ -1719,29 +1735,10 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     that makes progress towards this task. 
 
     """
-    if len(ties) == 1:
-        bestMove = ties[0][0]
-    else:
-        found_wait = False
-        for factor in ties:
-            bestMove = factor[0]
-            if factor[0] == agent_pos:
-                found_wait = True
-                break
-        if not found_wait:
-            ## Find the nearest task
-            _, path = bfsNearestTask(networkVertices, networkEdges,
-                                        agent_pos, taskPos)
-            assert path[-1] in taskPos
-            nearestTask = path[-1]
-            euclidean = float('inf')
-            for factor in ties:
-                ## find factor that moves towards task
-                r2_dist = np.sqrt((agent_pos[0]-nearestTask[0])**2 + 
-                                    (agent_pos[1]-nearestTask[1])**2)
-                if r2_dist < euclidean:
-                    euclidean = r2_dist
-                    bestMove = factor[0]
+    for factor in ties:
+        bestMove = factor[0]
+        if factor[0] == agent_pos:
+            break
 
     if bestMove == (round(agent_pos[0]+step, 1),agent_pos[1]):
         ret = 'e'
@@ -1794,8 +1791,7 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
             else:
                 move,c = multiAgentRollout(networkVertices, networkEdges,
                                         agentPositions, tempTasks, 
-                                        {a_ID:agent_pos}, 
-                                        waitAgents)
+                                        {a_ID:agent_pos})
 
             ## NOTE: Not needed - handled in stateUpdate
             ## Check if the move is causing a collision and if so then instead append a wait move
@@ -1985,13 +1981,13 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
 def main():
     totalCost = 0
     waitCost = 0
-    # df = pd.DataFrame({'Centralized':[], 'Seed #': [],
-    #                     'Rows': [], 'Cols': [], 'Wall Prob': [],
-    #                     '# of Agents': [], '# of Tasks': [],
-    #                     'k': [], 'psi': [], 'Total Time (s)': [],
-    #                     '# of Exploration': []})
-    # lookupTable = offlineTrainRes
-
+    ## Comment out for physical simulations
+    df = pd.DataFrame({'Centralized':[], 'Seed #': [], 'Exp Seed #': [],
+                        'Rows': [], 'Cols': [], 'Wall Prob': [],
+                        '# of Agents': [], '# of Tasks': [],
+                        'k': [], 'psi': [], 'Total Time (s)': [],
+                        '# of Exploration': []})
+    ## --------------------------------
     if centralized:
         begin = time.time()
         """
@@ -2033,12 +2029,14 @@ def main():
             explore_steps = 0
             r_pos = r_env.get_poses()
 
-            robot_markers = [r_env.axes.scatter(r_pos[0,ii] + 0.05, r_pos[1,ii] + 0.05, s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
+            ## Uncomment below line for Physical Simulations
+            # robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
 
             r_env.step()
             rounds = 0
             COMPLETION_PARAM = 0.0
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
+            cluster_count = 0.0
             while len(taskVertices) > target_completion:
                 # time.sleep(wait_time)
 
@@ -2346,15 +2344,17 @@ def main():
                                 ## only update visualizer if color changes
                                 a.gui_split = True
                     mergeTimelines()
-
-                r_pos = r_env.get_poses()
-                for i in range(A):
-                    agent = agents[i]
-                    clusterM = 0
-                    if len(agent.getCluster()) > 0:
-                        clusterM = agent.getCluster()[0]
-                    robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
-                r_env.step()
+                
+                ## Uncomment below line for Physical Simulations
+                # r_pos = r_env.get_poses()
+                # for i in range(A):
+                #     agent = agents[i]
+                #     clusterM = 0
+                #     if len(agent.getCluster()) > 0:
+                #         clusterM = agent.getCluster()[0]
+                #     robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
+                # r_env.step()
+                ## -------------------------------------------------
 
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
@@ -2370,6 +2370,14 @@ def main():
                             print(b.ID, end=" ")
                         print()
                     print()
+
+                unique_clusters = set()
+                for a in agents:
+                    if a.parent == None and len(a.clusterID) != 0:
+                        unique_clusters.add(a.clusterID[0])
+                # cluster_count = ((cluster_count*(rounds-1))+ \
+                #                 len(unique_clusters))/rounds
+                cluster_count += len(unique_clusters)
 
                 """
                 ---------------------------- LMA ----------------------------
@@ -2569,6 +2577,7 @@ def main():
                 # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                 # Sync execution of actions all at once
                 num_iterations = (2**(psi))*k
+                tempTasks = taskVertices.copy()
                 clusterAgents = [x for x in agents if len(x.clusterID) > 0]
                 iters = 0
                 while len([x for x in clusterAgents if len(x.moves) > 0]) > 0 if len(clusterAgents) > 0 else iters < num_iterations:
@@ -2586,7 +2595,7 @@ def main():
                             a.clusterID = []
 
                     ## Let this be done in tandem with the stateUpdate with all the collision resolution
-                    goal_points, totalCost, waitCost, explore_steps = stateUpdate(r_pos, totalCost, waitCost, explore_steps)
+                    goal_points, totalCost, waitCost, explore_steps = stateUpdate(r_pos, totalCost, waitCost, explore_steps, tempTasks)
 
                     # print(r_pos)
                     # print(goal_points)
@@ -2596,10 +2605,11 @@ def main():
                         # Get poses of agents
                         r_pos = r_env.get_poses()
 
-                        for i in range(A):
-                            agent = agents[i]
-                            # Comment this for bulk runs
-                            robot_markers[i].set_offsets(r_pos[:2,i].T + 0.05)
+                        ## Uncomment below line for Physical Simulations
+                        # for i in range(A):
+                        #     agent = agents[i]
+                            # robot_markers[i].set_offsets(r_pos[:2,i].T)
+                        ## -------------------------------------------------
 
                         # Create unicycle control inputs
                         dxu = unicycle_pose_controller(r_pos, goal_points)
@@ -2619,11 +2629,12 @@ def main():
                     for t in taskVertices:
                         if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
                             remove_t.add(t)
-                            # Comment this for bulk runs
-                            for ts in taskss:
-                                if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
-                                    ts.set_visible(False)
-                                    break
+                            ## Uncomment below line for Physical Simulations
+                            # for ts in taskss:
+                            #     if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
+                            #         ts.set_visible(False)
+                            #         break
+                            ## -------------------------------------------------
                     for t in remove_t:
                         taskVertices.remove(t)
                     r_env.step()
@@ -2643,11 +2654,13 @@ def main():
                     a.posY_prime = a.posY
 
                 # time.sleep(wait_time)
-                r_pos = r_env.get_poses()
-                for i in range(A):
-                    agent = agents[i]
-                    robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
-                r_env.step()
+                ## Uncomment below line for Physical Simulations
+                # r_pos = r_env.get_poses()
+                # for i in range(A):
+                #     agent = agents[i]
+                #     robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
+                # r_env.step()
+                ## ----------------------------------------------
                 sys.stdout.flush()
                 # if visualizer:
                 #     costLabel=Label(root,text='Total Cost: '+str(totalCost))
@@ -2671,25 +2684,27 @@ def main():
 
     new_data['Total Cost'] = str(totalCost)
     new_data['Total Time (s)'] = str(totalTime)
+    new_data['Average Cluster Count'] = str(cluster_count)
     if verbose == '-1':
         print(new_data)
     print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
      f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
 
-    # df = df.append(new_data, ignore_index=True)
-    # df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+    ## Uncomment below line for Physical Simulations
+    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
-    # # create unique filename...
-    # filename = "./results/exps_" + \
-    #     str(seed) + "_" + str(numTasks) + "_" + \
-    #     str(k) + "_base_" + str(only_base_policy) + ".xlsx"
+    # create unique filename...
+    filename = "./results/exps_" + \
+        str(seed) + "_" + str(numTasks) + "_" + \
+        str(k) + "_exp_seed_"+ str(exp_seed) +"_base_" + str(only_base_policy) + ".xlsx"
 
-    # if os.path.exists(filename) == False:
-    #     with pd.ExcelWriter(filename, mode="w") as writer:
-    #         df.to_excel(writer, index=False)
-    #         print("Creating file: ", filename)
-    # else:
-    #     print("File already exists... ")
+    if os.path.exists(filename) == False:
+        with pd.ExcelWriter(filename, mode="w") as writer:
+            df.to_excel(writer, index=False)
+            print("Creating file: ", filename)
+    else:
+        print("File already exists... ")
+    ## -------------------------------------------------
 
 #Driver
 # def start():
