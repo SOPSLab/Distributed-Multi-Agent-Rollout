@@ -180,28 +180,6 @@ def getParameters():
     parser.add_argument('--k', required=False, default=3)
     parser.add_argument('--psi', required=False, default=2)
     # parser.add_argument('--vis', required=False, default=False, action='store_true')
-    #current 10
-    #24921
-    #34321
-    #82931
-    #56122
-    #73192
-    #10932
-    #69347
-    #48369
-    #99918
-    #66182
-
-    #18621
-    #17392
-    #29038
-    #36148
-    #47771
-    #52918
-    #62110
-    #73224
-    #82710
-    #91883
     parser.add_argument('--seed', required=False, default=34321)
     parser.add_argument('--exp_seed', required=False, default=1272922)
     parser.add_argument('--wall_pr', required=False, default=0.2)

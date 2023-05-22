@@ -1,14 +1,16 @@
 import functools
-import os
 import sys
 # from tkinter import *
 # from PIL import ImageTk,Image
 import numpy as np
-import pandas as pd
 import random
 import time
+## Not required for the physical runs
+import os
+import pandas as pd
 import openpyxl
 import threading
+## ----------------------------------
 import rps.robotarium as robotarium
 from rps.utilities.transformations import *
 from rps.utilities.barrier_certificates import *
@@ -18,16 +20,6 @@ from rps.utilities.graph import *
 
 from robotarium_init import *
 
-#9288012
-#4527271
-#3729391
-#1272922
-#5362782
-#2893817
-#7828172
-#1093802
-#8199829
-#6545288
 # random.seed(12345)
 
 # Direction radians
@@ -171,6 +163,7 @@ random.seed(exp_seed)
 #         obstacles.append((x,round(y,1)))
 #         obs_dir.append(1)
 
+## Not needed
 # y_obs = [-1.0, 1]
 # for y in y_obs:
 #     for x in np.arange(0.8, -1.0, -0.2):
@@ -822,7 +815,7 @@ for a in agents:
 
 starting_pos = np.asarray(pos).T
 
-# print(starting_pos)
+# show_figure = True for physical simulation verification
 r_env = robotarium.Robotarium(number_of_robots=A, show_figure=False, initial_conditions=starting_pos,sim_in_real_time=True)
 
 ## Uncomment below when doing an actual experiment on robotarium with graphics
@@ -861,19 +854,13 @@ r_env = robotarium.Robotarium(number_of_robots=A, show_figure=False, initial_con
 
 robot_markers = []
 
-# unicycle_pose_controller = my_controller2(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
-# unicycle_pose_controller = create_clf_unicycle_pose_controller()
 ##og
 # unicycle_pose_controller = create_hybrid_unicycle_pose_controller(1, 0.5, 0.2, np.pi, 0.05, 0.03, 0.01)
 ## take it slow there are still some collisions occuring for linear_velocity_gain = 0.3
 unicycle_pose_controller = create_hybrid_unicycle_pose_controller(0.3, 0.3, 0.2, np.pi, 0.05, 0.03, 0.01)
-# unicycle_pose_controller = create_hybrid_unicycle_pose_controller()
-# unicycle_pose_controller = create_clf_unicycle_position_controller(linear_velocity_gain=0.5, angular_velocity_gain=1)
 
 # Create barrier certificates to avoid collision
 uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.12, 0.01, 0.2)
-# uni_barrier_cert = create_unicycle_barrier_certificate(100, 0.15, 0.05, 0.2)
-# uni_barrier_cert = create_unicycle_barrier_certificate()
 
 def getOppositeDirection(direction):
     if direction == 'n':
@@ -961,13 +948,6 @@ def getExplorationMove(agent, updated_pos):
 def getLegalMovesFrom(agent, updated_pos):
     # Guard against potential collision
     moves = ['q']
-    ## NOTNEEDED: all the agents in the view and ones which have moved before
-    ## use updated_pos instead of a.viewAgents since that is outdated
-    # filtered = [x for x in a.viewAgents if x.ID < agent.ID]
-    # filtered_pos = []
-    # for n in filtered:
-    #     filtered_pos.append((n.posX, n.posY))
-    ## TODO: Rewrite this copy pasted crap, this is not right, why are there 2 hops ?
     up = round(agent.posY+1*step, 1)
     down = round(agent.posY-1*step, 1)
     left = round(agent.posX-1*step, 1)
@@ -1083,7 +1063,7 @@ def stateUpdate(r_pos, totalCost, waitCost, explore_steps, tempTasks):
             else:
                 all_pos[(a.posX, a.posY)] = [a.ID]
     
-    ## TODO: Resolve collision - both 1. Intra Cluster 2. Inter Cluster
+    ## Resolve collision - both 1. Intra Cluster 2. Inter Cluster
     ## Resolve all collisions
     ## NOTE: Backtracking can cause collisions as well and for trajectory based forward moving this is even bigger
     ## problem because then we would have to backtrack for mutliple steps
@@ -2001,13 +1981,13 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
 def main():
     totalCost = 0
     waitCost = 0
+    ## Comment out for physical simulations
     df = pd.DataFrame({'Centralized':[], 'Seed #': [], 'Exp Seed #': [],
                         'Rows': [], 'Cols': [], 'Wall Prob': [],
                         '# of Agents': [], '# of Tasks': [],
                         'k': [], 'psi': [], 'Total Time (s)': [],
                         '# of Exploration': []})
-    # lookupTable = offlineTrainRes
-
+    ## --------------------------------
     if centralized:
         begin = time.time()
         """
@@ -2049,6 +2029,7 @@ def main():
             explore_steps = 0
             r_pos = r_env.get_poses()
 
+            ## Uncomment below line for Physical Simulations
             # robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
 
             r_env.step()
@@ -2364,7 +2345,7 @@ def main():
                                 a.gui_split = True
                     mergeTimelines()
                 
-                ## Commented for bulk trials
+                ## Uncomment below line for Physical Simulations
                 # r_pos = r_env.get_poses()
                 # for i in range(A):
                 #     agent = agents[i]
@@ -2373,6 +2354,7 @@ def main():
                 #         clusterM = agent.getCluster()[0]
                 #     robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
                 # r_env.step()
+                ## -------------------------------------------------
 
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
@@ -2623,10 +2605,11 @@ def main():
                         # Get poses of agents
                         r_pos = r_env.get_poses()
 
-                        # Comment this for bulk runs
+                        ## Uncomment below line for Physical Simulations
                         # for i in range(A):
                         #     agent = agents[i]
                             # robot_markers[i].set_offsets(r_pos[:2,i].T)
+                        ## -------------------------------------------------
 
                         # Create unicycle control inputs
                         dxu = unicycle_pose_controller(r_pos, goal_points)
@@ -2646,11 +2629,12 @@ def main():
                     for t in taskVertices:
                         if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
                             remove_t.add(t)
-                            # Comment this for bulk runs
+                            ## Uncomment below line for Physical Simulations
                             # for ts in taskss:
                             #     if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
                             #         ts.set_visible(False)
                             #         break
+                            ## -------------------------------------------------
                     for t in remove_t:
                         taskVertices.remove(t)
                     r_env.step()
@@ -2670,11 +2654,13 @@ def main():
                     a.posY_prime = a.posY
 
                 # time.sleep(wait_time)
+                ## Uncomment below line for Physical Simulations
                 # r_pos = r_env.get_poses()
                 # for i in range(A):
                 #     agent = agents[i]
                 #     robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
                 # r_env.step()
+                ## ----------------------------------------------
                 sys.stdout.flush()
                 # if visualizer:
                 #     costLabel=Label(root,text='Total Cost: '+str(totalCost))
@@ -2704,7 +2690,7 @@ def main():
     print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
      f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
 
-    # df = df.append(new_data, ignore_index=True)
+    ## Uncomment below line for Physical Simulations
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
     # create unique filename...
@@ -2718,12 +2704,13 @@ def main():
             print("Creating file: ", filename)
     else:
         print("File already exists... ")
+    ## -------------------------------------------------
 
 #Driver
-def start():
-    #print('starting')
-    t=threading.Thread(target=main)
-    t.start()
+# def start():
+#     #print('starting')
+#     t=threading.Thread(target=main)
+#     t.start()
 
 # if __name__ == "__main__":
 #   main()
