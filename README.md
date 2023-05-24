@@ -51,5 +51,11 @@ Then run the simulation<br>
 
 ## Compute Information
 
-Traditional x86 compute nodes were used which contained two Intel Xeon E5-2680 v4 CPUs running at 2.40GHz with at least 128 GB of RAM. There were 28 high speed Broadwell class CPU cores per node.
+Discrete simulations of the algorithms were mostly run on Agave compute nodes and physics based continous space simulations were run exclusively on Biodesign compute node.
+
+### Agave compute nodes
+Traditional x86 compute nodes were used which contain two Intel Xeon E5-2680 v4 CPUs running at 2.40GHz with at least 128 GB of RAM. There are 28 high speed Broadwell class CPU cores per node.
+
+### Biodesign compute node
+A single compute node with AMD Ryzen 9 7950X Processor with 16 cores and 32 threads along with 64 GB of RAM.
 
