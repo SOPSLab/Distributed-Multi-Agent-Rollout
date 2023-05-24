@@ -48,10 +48,10 @@ As before the main algorithm is housed in the `robotarium_main.py` file with `ro
 4. To execute the algorithm on an instance execute `main.py` with the same parameter set used while running `create_inst.py`.<br>
 
 Create the instance of the simulation<br>
-`python create_inst.py --row 10 --col 10 --agt 8 --task 25 --k 2 --psi 3 --seed 31223 --wall_pr 0.2 --no_colis --exp 4`<br>
+`python create_inst.py --row 10 --col 10 --agt 8 --task 25 --k 2 --psi 3 --seed 31223 --wall_pr 0.2 --no_colis --exp 4 --run_num 4`<br>
 
 Then run the simulation<br>
-`python main.py --row 10 --col 10 --agt 8 --task 25 --k 2 --psi 3 --seed 31223 --wall_pr 0.2 --no_colis --exp 4 --vis`<br>
+`python main.py --row 10 --col 10 --agt 8 --task 25 --k 2 --psi 3 --seed 31223 --wall_pr 0.2 --no_colis --exp 4 --vis --run_num 4`<br>
 
 ### Simple execution flow for Physics based continuous space simulation
 1. For continuous space simulations there is no need to specifically create an instance to run the simulation, to execute the algorithm simply specify parameters to the `robotarium_main.py` script, as given below.<br>
@@ -59,11 +59,10 @@ Then run the simulation<br>
 `python robotarium_main.py --k 4 --task 14 --seed 82931 --exp_seed 3729391`
 
 To run the simulations on physical robots
-1. Make changes to the `robotarium_main.py` as per the comments to enable the script to be run on robotarium platform remotely.
-2. Visit Robotarium platform's website and create an account as per the instructions given [here](https://www.robotarium.gatech.edu/get_started)
-3. Once logged in and dashboard is accessible submit a request for a new experiment with `Estimated Duration` set to `900` seconds and `Number of Robots` set to `7`
-4. Upload `robotarium_init.py` and `robotarium_main.py` script files in the experiment files section and check `robotarium_main.py` file to be main file
-5. Submit the experiment
+1. Visit Robotarium platform's website and create an account as per the instructions given [here](https://www.robotarium.gatech.edu/get_started)
+2. Once logged in and dashboard is accessible submit a request for a new experiment with `Estimated Duration` set to `900` seconds and `Number of Robots` set to `7`
+3. Upload `robotarium_init.py` and `robotarium_main_remote.py` script files in the experiment files section and check `robotarium_main_remote.py` file to be main file
+4. Submit the experiment
 
 ## Compute Information
 
