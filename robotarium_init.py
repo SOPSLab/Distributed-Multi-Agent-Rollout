@@ -3,9 +3,9 @@ import argparse
 import random
 
 """
-The init file for robotarium based simulations is same as the discrete simulation's init file
-however functions like bfsFindAgents is brought over from utils file and customized for 
-continous space
+The init file for robotarium based simulations is same as the discrete simulation's 
+init file however functions like bfsFindAgents is brought over from utils file and 
+customized for continous space
 """
 def bfsFindAgents(networkVertices, networkEdges, source, agentVertices):
     Q = []

@@ -3,12 +3,6 @@ import sys
 import numpy as np
 import random
 import time
-## Not required for the physical runs
-import os
-import pandas as pd
-import openpyxl
-import threading
-## ----------------------------------
 import rps.robotarium as robotarium
 from rps.utilities.transformations import *
 from rps.utilities.barrier_certificates import *
@@ -21,9 +15,11 @@ from robotarium_init import *
 """
 The main file for robotarium based simulations is same as the discrete simulation's main 
 file however functions like bfs, bfsNearestTask, dirShortestPath are brought over 
-from utils file and customized for continous space to enable a concise codebase to be submitted
-to robotarium for physical robot simulations
+from utils file and customized for continous space to enable a concise codebase
+to be submitted to robotarium for physical robot simulations
 Also contains additional code for robotarium specific implementation of robot simulations
+NOTE: This is the main file o be uploaded along with robotarium_init.py for actual robot based
+simulations
 """
 
 # Direction radians
@@ -667,43 +663,29 @@ for a in agents:
 
 starting_pos = np.asarray(pos).T
 
-# show_figure = True for physical simulation verification
-r_env = robotarium.Robotarium(number_of_robots=A, show_figure=False, initial_conditions=starting_pos,sim_in_real_time=True)
+r_env = robotarium.Robotarium(number_of_robots=A, show_figure=True, initial_conditions=starting_pos,sim_in_real_time=True)
 
-## Uncomment below when doing an actual experiment on robotarium with graphics
+marker_size_obs = determine_marker_size(r_env, 0.03)
+marker_obs_sml = determine_marker_size(r_env, 0.02)
+marker_size_goal = determine_marker_size(r_env, 0.02)
+marker_size_robot = determine_marker_size(r_env, 0.04)
+taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
+for ii in range(len(taskVertices))]
 
-# marker_size_obs = determine_marker_size(r_env, 0.03)
-# marker_obs_sml = determine_marker_size(r_env, 0.02)
-# marker_size_goal = determine_marker_size(r_env, 0.02)
-# marker_size_robot = determine_marker_size(r_env, 0.04)
-# taskss = [r_env.axes.scatter(taskVertices[ii][0], taskVertices[ii][1], s=marker_size_goal, marker='o', facecolors='y',edgecolors='none',linewidth=2,zorder=-2)
-# for ii in range(len(taskVertices))]
+horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
+vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
 
-# horizontal_obs = [[-3, -1], [3, -1], [3, 1], [-3, 1], [-3, -1]]
-# vert_obs = [[-1, -3], [1, -3], [1, 3], [-1, 3], [-1, -3]]
+square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
 
-# square = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]
-
-# print(len(obs_dir))
-# print(len(obstacles))
-
-# shapes_dir = {
-#     0: horizontal_obs,
-#     1: vert_obs,
-#     2: 's'
-# }
-# 0 - horizontal
-# 1 - vertical
-# 2 - square
-
-# obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_obs_sml if obs_dir[ii] == 2 else marker_size_obs, marker=shapes_dir[obs_dir[ii]], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
-# for ii in range(len(obstacles))]
+shapes_dir = {
+    0: horizontal_obs,
+    1: vert_obs,
+    2: 's'
+}
 
 ## New obs
-# obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
-# for ii in range(len(obstacles))]
-
-## ------------------------------------------------------------
+obs = [r_env.axes.scatter(obstacles[ii][0], obstacles[ii][1], s= marker_size_obs, marker=shapes_dir[2], facecolors='k',edgecolors='k',linewidth=5,zorder=-2)
+for ii in range(len(obstacles))]
 
 robot_markers = []
 
@@ -1490,13 +1472,6 @@ def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
 def main():
     totalCost = 0
     waitCost = 0
-    ## Comment out for physical simulations
-    df = pd.DataFrame({'Centralized':[], 'Seed #': [], 'Exp Seed #': [],
-                        'Rows': [], 'Cols': [], 'Wall Prob': [],
-                        '# of Agents': [], '# of Tasks': [],
-                        'k': [], 'psi': [], 'Total Time (s)': [],
-                        '# of Exploration': []})
-    ## --------------------------------
     if centralized:
         return
     else:
@@ -1505,8 +1480,7 @@ def main():
             explore_steps = 0
             r_pos = r_env.get_poses()
 
-            ## Uncomment below line for Physical Simulations
-            # robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
+            robot_markers = [r_env.axes.scatter(r_pos[0,ii], r_pos[1,ii], s=marker_size_robot, marker='s', facecolors='none',edgecolors='none',linewidth=7) for ii in range(A)]
 
             r_env.step()
             rounds = 0
@@ -1814,16 +1788,14 @@ def main():
                                 a.gui_split = True
                     mergeTimelines()
                 
-                ## Uncomment below line for Physical Simulations
-                # r_pos = r_env.get_poses()
-                # for i in range(A):
-                #     agent = agents[i]
-                #     clusterM = 0
-                #     if len(agent.getCluster()) > 0:
-                #         clusterM = agent.getCluster()[0]
-                #     robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
-                # r_env.step()
-                ## -------------------------------------------------
+                r_pos = r_env.get_poses()
+                for i in range(A):
+                    agent = agents[i]
+                    clusterM = 0
+                    if len(agent.getCluster()) > 0:
+                        clusterM = agent.getCluster()[0]
+                    robot_markers[i] = r_env.axes.scatter(r_pos[0,i], r_pos[1,i], s=marker_size_robot, marker=marker_shapes[clusterM], facecolors='none',edgecolors=colorIndex[agent.getColor()-1],linewidth=7)
+                r_env.step()
 
                 if '1' in verbose or verbose == '-1':
                     print("End of SOAC... ")
@@ -2066,11 +2038,9 @@ def main():
                         # Get poses of agents
                         r_pos = r_env.get_poses()
 
-                        ## Uncomment below line for Physical Simulations
-                        # for i in range(A):
-                        #     agent = agents[i]
-                            # robot_markers[i].set_offsets(r_pos[:2,i].T)
-                        ## -------------------------------------------------
+                        for i in range(A):
+                            agent = agents[i]
+                            robot_markers[i].set_offsets(r_pos[:2,i].T)
 
                         # Create unicycle control inputs
                         dxu = unicycle_pose_controller(r_pos, goal_points)
@@ -2086,12 +2056,10 @@ def main():
                     for t in taskVertices:
                         if any(np.linalg.norm(r_pos[:2,:] - np.reshape(np.array(t), (2,1)), axis=0) < 0.1):
                             remove_t.add(t)
-                            ## Uncomment below line for Physical Simulations
-                            # for ts in taskss:
-                            #     if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
-                            #         ts.set_visible(False)
-                            #         break
-                            ## -------------------------------------------------
+                            for ts in taskss:
+                                if ts.get_offsets()[0][0] == t[0] and ts.get_offsets()[0][1] == t[1]:
+                                    ts.set_visible(False)
+                                    break
                     for t in remove_t:
                         taskVertices.remove(t)
                     r_env.step()
@@ -2110,13 +2078,11 @@ def main():
                     a.posX_prime = a.posX
                     a.posY_prime = a.posY
 
-                ## Uncomment below line for Physical Simulations
-                # r_pos = r_env.get_poses()
-                # for i in range(A):
-                #     agent = agents[i]
-                #     robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
-                # r_env.step()
-                ## ----------------------------------------------
+                r_pos = r_env.get_poses()
+                for i in range(A):
+                    agent = agents[i]
+                    robot_markers[i].set_edgecolors(colorIndex[agent.getColor()-1])
+                r_env.step()
                 sys.stdout.flush()
 
             end = time.time()
@@ -2137,21 +2103,6 @@ def main():
         print(new_data)
     print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
      f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
-
-    ## Uncomment below line for Physical Simulations
-    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
-
-    # create unique filename...
-    filename = "./results/exps_" + \
-        str(seed) + "_" + str(numTasks) + "_" + \
-        str(k) + "_exp_seed_"+ str(exp_seed) +"_base_" + str(only_base_policy) + ".xlsx"
-
-    if os.path.exists(filename) == False:
-        with pd.ExcelWriter(filename, mode="w") as writer:
-            df.to_excel(writer, index=False)
-            print("Creating file: ", filename)
-    else:
-        print("File already exists... ")
     
 
 main()
