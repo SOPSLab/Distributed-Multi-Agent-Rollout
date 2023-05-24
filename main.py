@@ -13,6 +13,15 @@ import threading
 import utils as ut
 from init import getParameters
 
+"""
+Main algorithm file
+Content Summary:
+1. Based on the parameters passed a particular algorithm is executed
+2. The output of the executed run on the instance specified is then saved to a data file
+3. If the visualization parameter is set to true a visual rendering of the execution of the grid instance and all
+   the motion of the agent is displayed, handled in specifically - visualizer code block
+"""
+
 random.seed(9012)
 
 wait_time = 0
@@ -149,6 +158,9 @@ if visualizer:
         gridLabels[taskVertices[i][0]][taskVertices[i][1]].grid(
             row=taskVertices[i][0],column=taskVertices[i][1])
 
+"""
+A visual grid updated function used to make changes to the rendering of the grid
+"""
 def changeCell(x,y,cellType,agentNum):
     sys.stdout.flush()
     gridLabels[x][y].grid_forget()
@@ -167,6 +179,10 @@ def changeCell(x,y,cellType,agentNum):
             padx=padding,pady=padding,relief="solid")
         gridLabels[x][y].grid(row=x,column=y)
 
+"""
+The Agent class is used to create an instance of an agent and used to represent and interact as an agent operating in 
+an instance of the grid map 
+"""
 class Agent:
     def __init__(self,x,y,ID,color=1):
         self.posX=x
@@ -213,6 +229,9 @@ class Agent:
         del self.localVertices_prime, self.localTasks_prime, self.localEdges_prime, self.localAgents_prime
         del self.childMarkers_prime, self.moveList_prime
 
+    """
+    Reset the agent state to an initial condition
+    """
     def reset(self):
 
         self.dir=''
@@ -283,7 +302,10 @@ class Agent:
 
     def move(self,dir):
         self.dir=dir
-
+    """
+    Once an agent changes its location we use the following function to update its local map with new set of visible
+    nodes and task nodes
+    """
     def updateView(self):
         self.viewEdges=set()
         self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY)))
@@ -299,8 +321,6 @@ class Agent:
         #Create Internal Representation
         for i in range(1,k+1):
             if (self.posX+i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX+i,self.posY)))
-                #self.viewEdges.add(((self.posX+i,self.posY),(self.posX,self.posY)))
                 self.viewVertices.add((self.posX+i,self.posY))
                 self.viewVertices_prime.add((self.posX+i,self.posY))
                 if (self.posX+i,self.posY) in taskVertices:
@@ -308,24 +328,18 @@ class Agent:
                     self.viewTasks_prime.add((self.posX+i,self.posY))
                 for j in  range(1,k-i+1):
                     if (self.posX+i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY+j-1),(self.posX+i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY+j),(self.posX+i,self.posY+j-1)))
                         self.viewVertices.add((self.posX+i,self.posY+j))
                         self.viewVertices_prime.add((self.posX+i,self.posY+j))
                         if (self.posX+i,self.posY+j) in taskVertices:
                             self.viewTasks.add((self.posX+i,self.posY+j))
                             self.viewTasks_prime.add((self.posX+i,self.posY+j))
                     if (self.posX+i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY-j+1),(self.posX+i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY-j),(self.posX+i,self.posY-j+1)))
                         self.viewVertices.add((self.posX+i,self.posY-j))
                         self.viewVertices_prime.add((self.posX+i,self.posY-j))
                         if (self.posX+i,self.posY-j) in taskVertices:
                             self.viewTasks.add((self.posX+i,self.posY-j))
                             self.viewTasks_prime.add((self.posX+i,self.posY-j))
             if (self.posX-i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX-i,self.posY)))
-                #self.viewEdges.add(((self.posX-i,self.posY),(self.posX,self.posY)))
                 self.viewVertices.add((self.posX-i,self.posY))
                 self.viewVertices_prime.add((self.posX-i,self.posY))
                 if (self.posX-i,self.posY) in taskVertices:
@@ -333,8 +347,6 @@ class Agent:
                     self.viewTasks_prime.add((self.posX-i,self.posY))
                 for j in  range(1,k-i+1):
                     if (self.posX-i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY+j-1),(self.posX-i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY+j),(self.posX-i,self.posY+j-1)))
                         self.viewVertices.add((self.posX-i,self.posY+j))
                         self.viewVertices_prime.add((self.posX-i,self.posY+j))
                         if (self.posX-i,self.posY+j) in taskVertices:
@@ -342,8 +354,6 @@ class Agent:
                             self.viewTasks_prime.add((self.posX-i,self.posY+j))
 
                     if (self.posX-i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY-j+1),(self.posX-i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY-j),(self.posX-i,self.posY-j+1)))
                         self.viewVertices.add((self.posX-i,self.posY-j))
                         self.viewVertices_prime.add((self.posX-i,self.posY-j))
                         if (self.posX-i,self.posY-j) in taskVertices:
@@ -352,8 +362,6 @@ class Agent:
 
 
             if (self.posX,self.posY+i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY+i)))
-                # self.viewEdges.add(((self.posX,self.posY+i),(self.posX,self.posY)))
                 self.viewVertices.add((self.posX,self.posY+i))
                 self.viewVertices_prime.add((self.posX,self.posY+i))
                 if (self.posX,self.posY+i) in taskVertices:
@@ -361,16 +369,12 @@ class Agent:
                     self.viewTasks_prime.add((self.posX,self.posY+i))
                 for j in  range(1,k-i+1):
                     if (self.posX+j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX+j-1,self.posY+i),(self.posX+j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX+j,self.posY+i),(self.posX+j-1,self.posY+i)))
                         self.viewVertices.add((self.posX+j,self.posY+i))
                         self.viewVertices_prime.add((self.posX+j,self.posY+i))
                         if (self.posX+j,self.posY+i) in taskVertices:
                             self.viewTasks.add((self.posX+j,self.posY+i))
                             self.viewTasks_prime.add((self.posX+j,self.posY+i))
                     if (self.posX-j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY+i),(self.posX-j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY+i)))
                         self.viewVertices.add((self.posX-j,self.posY+i))
                         self.viewVertices_prime.add((self.posX-j,self.posY+i))
                         if (self.posX-j,self.posY+i) in taskVertices:
@@ -378,8 +382,6 @@ class Agent:
                             self.viewTasks_prime.add((self.posX-j,self.posY+i))
 
             if (self.posX,self.posY-i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY-i)))
-                #self.viewEdges.add(((self.posX,self.posY-i),(self.posX,self.posY)))
                 self.viewVertices.add((self.posX,self.posY-i))
                 self.viewVertices_prime.add((self.posX,self.posY-i))
                 if (self.posX,self.posY-i) in taskVertices:
@@ -387,16 +389,12 @@ class Agent:
                     self.viewTasks_prime.add((self.posX,self.posY-i))
                 for j in  range(1,k-i+1):
                     if (self.posX+j,self.posY-i) in vertices:
-                        # self.viewEdges.add(((self.posX+j-1,self.posY-i),(self.posX+j,self.posY-i)))
-                        # self.viewEdges.add(((self.posX+j,self.posY-i),(self.posX+j-1,self.posY-i)))
                         self.viewVertices.add((self.posX+j,self.posY-i))
                         self.viewVertices_prime.add((self.posX+j,self.posY-i))
                         if (self.posX+j,self.posY-i) in taskVertices:
                             self.viewTasks.add((self.posX+j,self.posY-i))
                             self.viewTasks_prime.add((self.posX+j,self.posY-i))
                     if (self.posX-j,self.posY-i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY-i),(self.posX-j,self.posY-i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY-i)))
                         self.viewVertices.add((self.posX-j,self.posY-i))
                         self.viewVertices_prime.add((self.posX-j,self.posY-i))
                         if (self.posX-j,self.posY-i) in taskVertices:
@@ -444,7 +442,7 @@ class Agent:
             s_prime=self.viewVertices_prime.copy()
             E_prime=self.viewEdges_prime.copy()
             T_prime=self.viewTasks_prime.copy()
-            ##print(E)
+
             for u in s:
                 if u!=(self.posX,self.posY) and not ut.bfs(s,E,(self.posX,self.posY),u):
                     for e in E:
@@ -465,6 +463,10 @@ class Agent:
                         self.viewTasks_prime.remove(u)
             del s_prime
 
+    """
+    Based on the offset for x and y coordinates in the grid update the given grid coordinates provided
+    A simple linear transformation is performed
+    """
     def mapOffset(self,offX,offY,mapVerts,mapEdges,mapTasks,mapAgents):
         vertices=set()
         edges=set()
@@ -479,13 +481,12 @@ class Agent:
             taskSet.add((t[0]-offX,t[1]-offY))
         for a in mapAgents:
             agentSet[a.ID] = (offX, offY)
-            # agent.posX-=offX
-            # agent.posY-=offY
-            # agentSet.add(agent)
 
-        #print("mapOffset: ", agentSet)
         return [vertices,edges,taskSet,agentSet]
 
+    """
+    Uses the mapOffset function to transform the local view from global centric to local centric view
+    """
     def updateLocalView(self):
         l=self.mapOffset(self.posX,self.posY,self.viewVertices,self.viewEdges,self.viewTasks,self.viewAgents)
         self.localVertices=l[0]
@@ -493,6 +494,10 @@ class Agent:
         self.localTasks=l[2]
         self.localAgents=l[3]
 
+"""
+Once all the agents have moved and updated their local maps perform the an update once more to correctly place
+place other agents in a particular agent's view
+"""
 def updateAgentToAgentView():
     for a in agents:
         a.viewAgents.add(a)
@@ -525,6 +530,13 @@ def getOppositeDirection(direction):
     elif direction == 'q':
         return 'q'
 
+"""
+A parameterized function to return the next move for the explroing agents to take.
+1. if exp_strat = 0, a random legal direction is choosen for single step of movement
+2. if exp_strat >= 1, Randomly sample a direction and a distance in that direction
+   where max distance is given by value of exp_strat
+3. if exp_strat = -1, nearest task is found (if any) and agent moves towards it, not task is found then agent does not move
+"""
 def getExplorationMove(agent, lookupTable):
     legal = getLegalMovesFrom(agent.posX, agent.posY)
     if exp_strat == 0:
@@ -583,7 +595,7 @@ def getExplorationMove(agent, lookupTable):
                 print(legal)
                 direction = random.choice(legal)
 
-                agent.exp_dir = direction ## Maybe we don't want to go back to where we came from?
+                agent.exp_dir = direction
 
         print("EXP_FLAG: ", seed, agent.exploring, agent.exp_dir, agent.exp_dist_remaining)
 
@@ -593,6 +605,9 @@ def getExplorationMove(agent, lookupTable):
 
         return direction
 
+"""
+Check for obstacles and grid bounds to decide if a move is legal
+"""
 def getLegalMovesFrom(x,y):
     moves=['q']
     if x+1 < rows and x+1 >= 0 and gridGraph[x+1][y] != 0:
@@ -605,6 +620,9 @@ def getLegalMovesFrom(x,y):
         moves.append('s')
     return moves
 
+"""
+Updates visual and agent position on grid and also updates the list of remaining tasks
+"""
 def stateUpdate():
     sys.stdout.flush()
 
@@ -633,6 +651,9 @@ def stateUpdate():
 
         sys.stdout.flush()
 
+"""
+A centralized execution of Multi-agent rollout algorithm with complete visibility of the grid
+"""
 def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prevMoves,lookupTable):
     currentPos={}
     for a in agents:
@@ -688,30 +709,20 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
             if e[1] != e[0]:
                 cost=prevCost+1
             else:
-                cost=prevCost ## not a bug!!
-            # cost = prevCost + 1
+                cost=prevCost
             tempPositions[agent]=e[1]
-            #print("lookahead edge: ", e)
             if tempPositions[agent]in tempCurrentTasks:
                 tempCurrentTasks.remove(tempPositions[agent])
             rounds = 0
             while len(tempCurrentTasks)>0:
-                # #print('flag2')
-                # print("POS: ", tempPositions, tempCurrentTasks, cost)
                 for a in agents:
                     shortestDist=float('inf')
                     bestNewPos=None
-                    #assert len(tempCurrentTasks)>0
-                    #print("======== Agent a: {} ========".format((a.posX, a.posY)))
                     for t in tempCurrentTasks:
                         try:
-                            #print("PRE:", tempPositions, a.posX, a.posY)
                             dist,path = (lookupTable[str(tempPositions[a])][str(t)])
                         except (AssertionError, KeyError):
                             continue
-                        #dist, path = lookupTable[str(tempPositions[a])][str(t)]
-
-                        # #print("\tPath: {}; Dist: {}".format(path, dist))
                         if dist<shortestDist:
                             shortestDist=dist
                             bestNewPos=path
@@ -723,17 +734,11 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
                     rounds += 1
                     if len(tempCurrentTasks)==0:
                         break
-            #print("resulting cost for action {}: {} ".format((e[0],e[1]), cost))
-            #print(e[1], cost)
             if cost<minCost:
                 minCost=cost
                 bestMove=e[1]
                 if bestMove == e[0]:
                     print("Waiting! ")
-                    # elif cost==minCost:
-            #    r=random.random()
-            #   if r<0.5:
-            #      bestMove=e[1]
             Qfactors.append((e[1],cost))
             del tempPositions
             del tempCurrentTasks
@@ -793,7 +798,10 @@ def multiAgentRolloutCent(networkVertices,networkEdges,agents,taskPos,agent,prev
     elif bestMove==(agent.posX,agent.posY):
         ret= 'q'
     return ret,minCost
-
+"""
+A 1-step look-ahead based implementation of the multi-agent rollout where each agent
+uses a greedy base policy to approximate its moves (after 1 step of look-ahead) and moves of other agent's in the cluster 
+"""
 def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, agent):
     for vertex in networkVertices:
         try:
@@ -813,6 +821,9 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
     agent_ID = list(agent.keys())[0]
     agent_pos = agent[agent_ID]
 
+    """
+    Perform 1-step look-ahead
+    """
     for e in networkEdges:
         assert e[0] in networkVertices
         assert e[1] in networkVertices
@@ -854,6 +865,9 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
                     print(tempPositions[a_ID], end=" ")
                 print()
 
+            """
+            Perform greedy base policy based execution until all the tasks are completed (horizon is reached)
+            """
             while len(tempCurrentTasks) > 0:
                 if '3' in verbose or verbose == '-1':
                     print("\tRemaining Tasks: ", len(tempCurrentTasks))
@@ -886,6 +900,9 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             if '3' in verbose or verbose == '-1':
                 print("\tCost-to-go for EOI: ", cost)
 
+            """
+            Compute the Q factors costs for each of the actions and find the best action with least Q factor cost
+            """
             if cost < minCost:
                 minCost = cost
                 bestMove = e[1]
@@ -894,7 +911,7 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             del tempPositions
             del tempCurrentTasks
 
-    assert bestMove != None     ## should at least wait... 
+    assert bestMove != None
 
     minQ = float('inf')
     for factor in Qfactors:
@@ -925,15 +942,6 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
             , ties)
 
     """
-    Question: 
-    ---------------------------
-
-    If we don't break ties randomly, then why bother creating a
-    list of ties and selecting the i-th  Qfactor (for some i)? 
-
-    """
-
-    """
     Note: 
     ---------------------------
 
@@ -962,6 +970,10 @@ def multiAgentRollout(networkVertices, networkEdges, networkAgents, taskPos, age
         print()
     return ret, minCost
 
+"""
+Centroid of the cluster initiates the cluster multi-agent rollout and then call multi-agent rollout for each of the agent
+consequently to complete a list of moves for each agent in the cluster
+"""
 def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkAgents, taskPos, agent):
     (x_offset, y_offset) = agent[centroidID]
     agentPositions = {}
@@ -1066,9 +1078,10 @@ def clusterMultiAgentRollout(centroidID, networkVertices, networkEdges, networkA
 
     return allPrevMoves
 
+"""
+An internal function used to merge the next update state into the current state
+"""
 def mergeTimelines():
-    # #print("Merging... ")
-    # Naive Merge
     for agent in agents:
         agent.posX = agent.posX_prime
         agent.posY = agent.posY_prime
@@ -1103,7 +1116,6 @@ def mergeTimelines():
         agent.dfsNext=agent.dfsNext_prime
 
         if agent.gui_split == True:
-            #print(agent.ID, agent.color)
             if visualizer:
                 changeCell(agent.posX, agent.posY, "agent", agent.color)
             agent.gui_split = False
@@ -1116,6 +1128,12 @@ def mergeTimelines():
                 if agent in x.children:
                     x.children.remove(agent)
 
+"""
+Finds the shortest path and distance between an agent and any task from the given task list
+provided that path lies in the view graph provided
+if a view graph is not provided, the lookup table cache is used to find this shortest path
+assuming complete grid is visible (except the obstacles)
+"""
 def getClosestClusterTask(agent_pos, taskList, lookupTable, **kwargs):
     (agent_posX, agent_posY) = agent_pos
     min_dist = float('inf')
@@ -1156,6 +1174,10 @@ def main():
     lookupTable = offlineTrainRes
 
     if centralized:
+        """
+        centralized execution of the multi-agent rollout algorithm or centralized base-policy execution block
+        A single timestep based execution of either of the policies applied consequently until all the tasks are complete
+        """
         begin = time.time()
         while len(taskVertices) > 0:
             moves = {}
@@ -1192,6 +1214,9 @@ def main():
             quitButton.invoke()
 
     else:
+        """
+        decentralized execution of the multi-agent rollout algorithm or decentralized base-policy execution block
+        """
         try:
             begin =  time.time()
             explore_steps = 0
@@ -1202,7 +1227,6 @@ def main():
             cluster_count = 0.0
             while len(taskVertices) > target_completion:
                 time.sleep(wait_time)
-
                 rounds += 1
 
                 for a in agents:
@@ -1210,7 +1234,6 @@ def main():
 
                 updateAgentToAgentView()
                 sys.stdout.flush()
-
 
                 if not pure_greedy:
                     """
@@ -1230,7 +1253,6 @@ def main():
 
                     """
                     for a in agents:
-                        # #print(a.viewTasks)
                         if a.eta > 0: ## a can see a task...
                             flag = True ## assume a is going to be the centroid of a new cluster...
 
@@ -1253,7 +1275,6 @@ def main():
                         by picking the agent that has the highest agent ID.
 
                     """
-                    # #print("RR:")
                     for a in agents:
                         if len(a.clusterID) > 0:
                             for x in a.viewAgents:
@@ -1696,6 +1717,10 @@ def main():
                     if '3' in verbose or verbose == '-1':
                         print("Beginning T-MAR... ")
                     clusterMoves = {}
+                    """
+                    Centroid begins the cluster Multi-agent rollout and computes the move list for each of the agent
+                    in that cluster
+                    """
                     for a in agents:
                         if a.parent==None and len(a.clusterID)>0:
                             agent = {a.ID: a.clusterAgents[a.ID]}
@@ -1727,9 +1752,7 @@ def main():
                                         b.message = True
 
                     ## loose upper bound... 
-                    # num_iterations = int(np.pi*5*(k*(2**(psi+1)-1))**2)
                     num_iterations = (2**psi)*k
-                    # num_iterations = 2
                     tempTasks = taskVertices.copy()
                     for i in range(num_iterations):
                         if 'r' in verbose or '3' in verbose or verbose == '-1':
@@ -1821,10 +1844,8 @@ def main():
                     costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
 
             end = time.time()
-            #print("Decentralized Cost: ", totalCost)
 
             totalTime = end-begin
-            #print("Decentralized Time: ", end - begin)
 
             new_data['# of Exploration Steps'] = explore_steps
             new_data['Wait Cost'] = waitCost
@@ -1859,12 +1880,9 @@ def main():
 
 #Driver
 def start():
-    #print('starting')
     t=threading.Thread(target=main)
     t.start()
 
-# if __name__ == "__main__":
-#   main()
 #Add Interface
 if visualizer:
     goButton=Button(root,text='Start',pady=10,padx=50,command=start)
