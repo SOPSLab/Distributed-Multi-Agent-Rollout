@@ -2,6 +2,14 @@ import os
 import pickle
 from tqdm import tqdm
 
+"""
+Utils file
+Content Summary:
+1. Used by other scripts of the repository
+2. Functions to load and store the instances to and from a data file
+3. 
+"""
+
 def save_file(filename, data):
     with open (filename, "wb") as fp:
         pickle.dump(data, fp)
@@ -22,6 +30,9 @@ def load_file(filename):
 
     return file
 
+"""
+An instance object is streamed and saved as a data file which can be used repeatedly
+"""
 def save_instance(instance, size, seed, offlineTraining):
     directory = "./instances/"+str(size)+"x"+str(size)+"/"+str(seed)
 
@@ -43,6 +54,9 @@ def save_instance(instance, size, seed, offlineTraining):
     save_file(directory + "/agentVertices", agentVertices)
     save_file(directory + "/taskVertices", taskVertices)
 
+"""
+An instance object is read from data file with a specific seed and size as instance identification
+"""
 def load_instance(size, seed):
     path = "./instances/"+str(size)+"x"+str(size)+"/"+str(seed)
     print(path)
@@ -58,6 +72,12 @@ def load_instance(size, seed):
 
     return {"gridGraph":gridGraph, "adjList":edgeList, "verts":vertices, "agnt_verts":agentVertices, "task_verts":taskVertices}, offlineTraining
 
+
+"""
+Given a graph structure creates a cache of all the paths between any two nodes in the graph
+An iterative implementation of the breath first search is used to find the shortest path
+between any two given nodes
+"""
 def offlineTrainCent(networkVertices, networkEdges):
     bfsTrees = {}
 
@@ -71,8 +91,6 @@ def offlineTrainCent(networkVertices, networkEdges):
         for u in networkVertices:
             if u != v:
                 try:
-                    # print(v, u)
-                    # print(bfsTrees[str(v)])
                     dist, path = bfsLookupSP(bfsTrees[str(v)], u)
                     lookupDict[str(v)][str(u)] = (dist, path[1])
                 except AssertionError:
@@ -80,6 +98,11 @@ def offlineTrainCent(networkVertices, networkEdges):
 
     return lookupDict
 
+
+"""
+Iterative implementation of a breadth first search on a graph structure
+which return if the goal node is found or not, (starting from a given root node)
+"""
 def bfs(vertices,edges,root,goal):
     Q=[]
     labels={}
@@ -98,6 +121,10 @@ def bfs(vertices,edges,root,goal):
                     Q.append(e[1])
     return False
 
+"""
+Iterative implementation of breath first traversal of the graph sructure while
+simultaneously building a tree structure as the breath first traversal progresses
+"""
 def getBFSTree(vertices, edges, source):
     tree_vertices = []
     tree_edges = []
@@ -106,8 +133,6 @@ def getBFSTree(vertices, edges, source):
     labels = {}
     prev = {}
 
-    #print("Source: ", source)
-
     for v in vertices:
         labels[str(v)] = False
 
@@ -115,7 +140,6 @@ def getBFSTree(vertices, edges, source):
     labels[str(source)] = True
     while(len(Q)) > 0:
         v = Q.pop(0)
-        # #print("Popping ", v)
         tree_vertices.append(v)
         if v == source:
             tree_edges.append((v, None))
@@ -130,6 +154,10 @@ def getBFSTree(vertices, edges, source):
 
     return tree_vertices, tree_edges
 
+"""
+An iterative implementation of the breath first search, used to find the shortest path
+to a given target node in a tree structure starting with the root of the tree 
+"""
 def bfsLookupSP(bfsTree, target):
     tree_vertices = bfsTree[0]
     tree_edges = bfsTree[1]
@@ -137,8 +165,6 @@ def bfsLookupSP(bfsTree, target):
     dist = 0
     path = []
 
-    # print("Target: ", target)
-    # print(tree_vertices)
     assert target in tree_vertices
     path.append(target)
 
@@ -160,7 +186,7 @@ def bfsLookupSP(bfsTree, target):
 
     return dist, list(reversed(path))
 
-
+## Not used
 def bfShortestPath(networkVertices, networkEdges, source, target):
     Q = []
     labels = {}
@@ -194,6 +220,10 @@ def bfShortestPath(networkVertices, networkEdges, source, target):
                     prev[str(edge[1])] = v
                     Q.append(edge[1])
 
+"""
+Iterative breath first traversal of a given graph structure to 
+check if any one of the agent nodes are reachable from the source node
+"""
 def bfsFindAgents(networkVertices, networkEdges, source, agentVertices):
     Q = []
     labels = {}
@@ -220,6 +250,10 @@ def bfsFindAgents(networkVertices, networkEdges, source, agentVertices):
 
     return False
 
+"""
+Uses breath first traversal to find the path and distance between the given source node 
+and the closest task node from a list of task nodes
+"""
 def bfsNearestTask(networkVertices, networkEdges, source, taskVertices):
     Q = []
     labels = {}
@@ -253,6 +287,10 @@ def bfsNearestTask(networkVertices, networkEdges, source, taskVertices):
 
     return None,None
 
+"""
+Iterative breath first traversal of a given graph structure to find the shortest path
+between given two nodes
+"""
 def dirShortestPath(networkVertices,networkEdges,source,target):
     Q=[]
     dist={}
