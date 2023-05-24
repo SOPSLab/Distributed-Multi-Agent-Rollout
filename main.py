@@ -1862,7 +1862,7 @@ def main():
         print(new_data)
         print(f"Total Cost: {totalCost}; Total Time (s): {totalTime};" + \
          f" Wait Cost: {waitCost}; Exploration Cost: {explore_steps}")
-    df = df.append(new_data, ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
     filename = "./results/" + str(rows) + "_" + "k_" + str(k) + "_" + "psi_" \
     + str(psi) + "_seed_" + str(seed) + "_" + str(centralized) + "_" + \
