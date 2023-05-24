@@ -38,7 +38,7 @@ The main algorithm is housed in the `main.py` file with rest of the accompanying
 The `init.py` script file is used to create and initialize random instances for the algorithms to run on. `create_inst.py` file contains the code to create an instance and a lookup table and save it as data files for repeated use. `utils.py` file contains the helper code functions and procedures used in other scripts.
 
 ### Continuous space simulation files
-As before the main algorithm is housed in the `robotarium_main.py` file with `robotarium_main`
+As before the main algorithm is housed in the `robotarium_main.py` file with `robotarium_main.py` used for running algorithm without visualization and `robotarium_main_remote.py` used to run algorithm on physical robots. The contents of the `utils.py` are split and moved to `robotarium_init.py` and the 2 main files to keep the codebase concise.
 ## Usage
 
 ### Simple execution flow for discrete space simulation
