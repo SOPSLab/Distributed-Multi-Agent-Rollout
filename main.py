@@ -299,6 +299,9 @@ class Agent:
 
         # #Create Internal Representation
         if view_mode == 0:
+            """
+                Limited-DFS View
+            """
             self.viewVertices, _ = ut.getLimitedDFSTree(vertices, adjList,
                                                         (self.posX,self.posY), k)
             self.viewVertices_prime, _ = ut.getLimitedDFSTree(vertices, adjList,
@@ -307,6 +310,9 @@ class Agent:
             self.viewTasks_prime = list(set(self.viewVertices).intersection(set(taskVertices)))
 
         elif view_mode == 2:
+            """
+                (Beta) Line of Sight
+            """
             for i in range(1,k+1):
                 if (self.posX+i,self.posY) in vertices:
                     self.viewVertices.add((self.posX+i,self.posY))
@@ -348,6 +354,9 @@ class Agent:
                     break
 
         elif view_mode == 1:
+            """
+                Manhattan Distance View
+            """
             for vertex in self.viewVertices:
                 if vertex in taskVertices:
                     self.viewTasks.add(vertex)
