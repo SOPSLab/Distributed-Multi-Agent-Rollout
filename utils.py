@@ -98,6 +98,41 @@ def bfs(vertices,edges,root,goal):
                     Q.append(e[1])
     return False
 
+def getLimitedDFSTree(vertices, edges, source, k):
+    tree_vertices = []
+    tree_edges = []
+
+    Q = []
+    labels = {}
+    prev = {}
+    depth = {}
+
+    #print("Source: ", source)
+
+    for v in vertices:
+        labels[str(v)] = False
+
+    Q.append(source)
+    depth[str(source)] = 0
+    labels[str(source)] = True
+    while(len(Q)) > 0:
+        v = Q.pop(-1)
+        # #print("Popping ", v)
+        tree_vertices.append(v)
+        if v == source:
+            tree_edges.append((v, None))
+
+        for edge in edges:
+            if edge[0] == v:
+                if (labels[str(edge[1])] == False) and (depth[str(edge[0])] <= (k-1)):
+                    prev[str(edge[1])] = v
+                    Q.append(edge[1])
+                    depth[str(edge[1])] = depth[str(edge[0])]+1
+                    tree_edges.append((edge[1], edge[0]))
+                    labels[str(edge[1])] = True
+
+    return tree_vertices, tree_edges
+
 def getBFSTree(vertices, edges, source):
     tree_vertices = []
     tree_edges = []

@@ -13,16 +13,16 @@ import threading
 import utils as ut
 from init import getParameters
 
-#random.seed(9012)
+random.seed(9012)
 
-wait_time = 0
+wait_time = 1.0
 
 totalCost = 0
 padding = 20
 
 rows, cols, A, numTasks, k, psi, centralized, visualizer, wall_prob, \
 seed, collisions, exp_strat, only_base_policy, pure_greedy, verbose, \
-depots, run_num = getParameters()
+depots, run_num, view_mode = getParameters()
 
 if depots:
     if run_num == 1:
@@ -296,174 +296,234 @@ class Agent:
         self.viewVertices_prime=set([(self.posX,self.posY)])
         self.viewAgents_prime=set()
         self.viewTasks_prime=set()
-        #Create Internal Representation
-        for i in range(1,k+1):
-            if (self.posX+i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX+i,self.posY)))
-                #self.viewEdges.add(((self.posX+i,self.posY),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX+i,self.posY))
-                self.viewVertices_prime.add((self.posX+i,self.posY))
-                if (self.posX+i,self.posY) in taskVertices:
-                    self.viewTasks.add((self.posX+i,self.posY))
-                    self.viewTasks_prime.add((self.posX+i,self.posY))
-                for j in  range(1,k-i+1):
-                    if (self.posX+i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY+j-1),(self.posX+i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY+j),(self.posX+i,self.posY+j-1)))
-                        self.viewVertices.add((self.posX+i,self.posY+j))
-                        self.viewVertices_prime.add((self.posX+i,self.posY+j))
-                        if (self.posX+i,self.posY+j) in taskVertices:
-                            self.viewTasks.add((self.posX+i,self.posY+j))
-                            self.viewTasks_prime.add((self.posX+i,self.posY+j))
-                    if (self.posX+i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX+i,self.posY-j+1),(self.posX+i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX+i,self.posY-j),(self.posX+i,self.posY-j+1)))
-                        self.viewVertices.add((self.posX+i,self.posY-j))
-                        self.viewVertices_prime.add((self.posX+i,self.posY-j))
-                        if (self.posX+i,self.posY-j) in taskVertices:
-                            self.viewTasks.add((self.posX+i,self.posY-j))
-                            self.viewTasks_prime.add((self.posX+i,self.posY-j))
-            if (self.posX-i,self.posY) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX-i,self.posY)))
-                #self.viewEdges.add(((self.posX-i,self.posY),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX-i,self.posY))
-                self.viewVertices_prime.add((self.posX-i,self.posY))
-                if (self.posX-i,self.posY) in taskVertices:
-                    self.viewTasks.add((self.posX-i,self.posY))
-                    self.viewTasks_prime.add((self.posX-i,self.posY))
-                for j in  range(1,k-i+1):
-                    if (self.posX-i,self.posY+j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY+j-1),(self.posX-i,self.posY+j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY+j),(self.posX-i,self.posY+j-1)))
-                        self.viewVertices.add((self.posX-i,self.posY+j))
-                        self.viewVertices_prime.add((self.posX-i,self.posY+j))
-                        if (self.posX-i,self.posY+j) in taskVertices:
-                            self.viewTasks.add((self.posX-i,self.posY+j))
-                            self.viewTasks_prime.add((self.posX-i,self.posY+j))
 
-                    if (self.posX-i,self.posY-j) in vertices:
-                        #self.viewEdges.add(((self.posX-i,self.posY-j+1),(self.posX-i,self.posY-j)))
-                        #self.viewEdges.add(((self.posX-i,self.posY-j),(self.posX-i,self.posY-j+1)))
-                        self.viewVertices.add((self.posX-i,self.posY-j))
-                        self.viewVertices_prime.add((self.posX-i,self.posY-j))
-                        if (self.posX-i,self.posY-j) in taskVertices:
-                            self.viewTasks.add((self.posX-i,self.posY-j))
-                            self.viewTasks_prime.add((self.posX-i,self.posY-j))
+        # #Create Internal Representation
+        if view_mode == 0:
+            self.viewVertices, _ = ut.getLimitedDFSTree(vertices, adjList,
+                                                        (self.posX,self.posY), k)
+            self.viewVertices_prime, _ = ut.getLimitedDFSTree(vertices, adjList,
+                                                        (self.posX,self.posY), k)
+            self.viewTasks = list(set(self.viewVertices).intersection(set(taskVertices)))
+            self.viewTasks_prime = list(set(self.viewVertices).intersection(set(taskVertices)))
+
+        elif view_mode == 2:
+            for i in range(1,k+1):
+                if (self.posX+i,self.posY) in vertices:
+                    self.viewVertices.add((self.posX+i,self.posY))
+                    self.viewVertices_prime.add((self.posX+i,self.posY))
+                    if (self.posX+i,self.posY) in taskVertices:
+                        self.viewTasks.add((self.posX+i,self.posY))
+                        self.viewTasks_prime.add((self.posX+i,self.posY))
+                else:
+                    break
+
+            for i in range(1,k+1):
+                if (self.posX,self.posY+i) in vertices:
+                    self.viewVertices.add((self.posX,self.posY+i))
+                    self.viewVertices_prime.add((self.posX,self.posY+i))
+                    if (self.posX,self.posY+i) in taskVertices:
+                        self.viewTasks.add((self.posX,self.posY+i))
+                        self.viewTasks_prime.add((self.posX,self.posY+i))
+                else:
+                    break
+
+            for i in range(1,k+1):
+                if (self.posX-i,self.posY) in vertices:
+                    self.viewVertices.add((self.posX-i,self.posY))
+                    self.viewVertices_prime.add((self.posX-i,self.posY))
+                    if (self.posX-i,self.posY) in taskVertices:
+                        self.viewTasks.add((self.posX-i,self.posY))
+                        self.viewTasks_prime.add((self.posX-i,self.posY))
+                else:
+                    break
+
+            for i in range(1,k+1):
+                if (self.posX,self.posY-i) in vertices:
+                    self.viewVertices.add((self.posX,self.posY-i))
+                    self.viewVertices_prime.add((self.posX,self.posY-i))
+                    if (self.posX,self.posY-i) in taskVertices:
+                        self.viewTasks.add((self.posX,self.posY-i))
+                        self.viewTasks_prime.add((self.posX,self.posY-i))
+                else:
+                    break
+
+        elif view_mode == 1:
+            for vertex in self.viewVertices:
+                if vertex in taskVertices:
+                    self.viewTasks.add(vertex)
+                    self.viewTasks_prime.add(vertex)
+
+            for i in range(1,k+1):
+                # flag_e = True
+                # flag_w = True
+                # flag_s = True
+                # flag_n = True
+                if (self.posX+i,self.posY) in vertices:
+                    #self.viewEdges.add(((self.posX,self.posY),(self.posX+i,self.posY)))
+                    #self.viewEdges.add(((self.posX+i,self.posY),(self.posX,self.posY)))
+                    self.viewVertices.add((self.posX+i,self.posY))
+                    self.viewVertices_prime.add((self.posX+i,self.posY))
+                    if (self.posX+i,self.posY) in taskVertices:
+                        self.viewTasks.add((self.posX+i,self.posY))
+                        self.viewTasks_prime.add((self.posX+i,self.posY))
+                    for j in  range(1,k-i+1):
+                        if (self.posX+i,self.posY+j) in vertices:
+                            #self.viewEdges.add(((self.posX+i,self.posY+j-1),(self.posX+i,self.posY+j)))
+                            #self.viewEdges.add(((self.posX+i,self.posY+j),(self.posX+i,self.posY+j-1)))
+                            self.viewVertices.add((self.posX+i,self.posY+j))
+                            self.viewVertices_prime.add((self.posX+i,self.posY+j))
+                            if (self.posX+i,self.posY+j) in taskVertices:
+                                self.viewTasks.add((self.posX+i,self.posY+j))
+                                self.viewTasks_prime.add((self.posX+i,self.posY+j))
+                        if (self.posX+i,self.posY-j) in vertices:
+                            #self.viewEdges.add(((self.posX+i,self.posY-j+1),(self.posX+i,self.posY-j)))
+                            #self.viewEdges.add(((self.posX+i,self.posY-j),(self.posX+i,self.posY-j+1)))
+                            self.viewVertices.add((self.posX+i,self.posY-j))
+                            self.viewVertices_prime.add((self.posX+i,self.posY-j))
+                            if (self.posX+i,self.posY-j) in taskVertices:
+                                self.viewTasks.add((self.posX+i,self.posY-j))
+                                self.viewTasks_prime.add((self.posX+i,self.posY-j))
+                if (self.posX-i,self.posY) in vertices:
+                    #self.viewEdges.add(((self.posX,self.posY),(self.posX-i,self.posY)))
+                    #self.viewEdges.add(((self.posX-i,self.posY),(self.posX,self.posY)))
+                    self.viewVertices.add((self.posX-i,self.posY))
+                    self.viewVertices_prime.add((self.posX-i,self.posY))
+                    if (self.posX-i,self.posY) in taskVertices:
+                        self.viewTasks.add((self.posX-i,self.posY))
+                        self.viewTasks_prime.add((self.posX-i,self.posY))
+                    for j in  range(1,k-i+1):
+                        if (self.posX-i,self.posY+j) in vertices:
+                            #self.viewEdges.add(((self.posX-i,self.posY+j-1),(self.posX-i,self.posY+j)))
+                            #self.viewEdges.add(((self.posX-i,self.posY+j),(self.posX-i,self.posY+j-1)))
+                            self.viewVertices.add((self.posX-i,self.posY+j))
+                            self.viewVertices_prime.add((self.posX-i,self.posY+j))
+                            if (self.posX-i,self.posY+j) in taskVertices:
+                                self.viewTasks.add((self.posX-i,self.posY+j))
+                                self.viewTasks_prime.add((self.posX-i,self.posY+j))
+
+                        if (self.posX-i,self.posY-j) in vertices:
+                            #self.viewEdges.add(((self.posX-i,self.posY-j+1),(self.posX-i,self.posY-j)))
+                            #self.viewEdges.add(((self.posX-i,self.posY-j),(self.posX-i,self.posY-j+1)))
+                            self.viewVertices.add((self.posX-i,self.posY-j))
+                            self.viewVertices_prime.add((self.posX-i,self.posY-j))
+                            if (self.posX-i,self.posY-j) in taskVertices:
+                                self.viewTasks.add((self.posX-i,self.posY-j))
+                                self.viewTasks_prime.add((self.posX-i,self.posY-j))
 
 
-            if (self.posX,self.posY+i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY+i)))
-                # self.viewEdges.add(((self.posX,self.posY+i),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX,self.posY+i))
-                self.viewVertices_prime.add((self.posX,self.posY+i))
-                if (self.posX,self.posY+i) in taskVertices:
-                    self.viewTasks.add((self.posX,self.posY+i))
-                    self.viewTasks_prime.add((self.posX,self.posY+i))
-                for j in  range(1,k-i+1):
-                    if (self.posX+j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX+j-1,self.posY+i),(self.posX+j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX+j,self.posY+i),(self.posX+j-1,self.posY+i)))
-                        self.viewVertices.add((self.posX+j,self.posY+i))
-                        self.viewVertices_prime.add((self.posX+j,self.posY+i))
-                        if (self.posX+j,self.posY+i) in taskVertices:
-                            self.viewTasks.add((self.posX+j,self.posY+i))
-                            self.viewTasks_prime.add((self.posX+j,self.posY+i))
-                    if (self.posX-j,self.posY+i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY+i),(self.posX-j,self.posY+i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY+i)))
-                        self.viewVertices.add((self.posX-j,self.posY+i))
-                        self.viewVertices_prime.add((self.posX-j,self.posY+i))
-                        if (self.posX-j,self.posY+i) in taskVertices:
-                            self.viewTasks.add((self.posX-j,self.posY+i))
-                            self.viewTasks_prime.add((self.posX-j,self.posY+i))
+                if (self.posX,self.posY+i) in vertices:
+                    #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY+i)))
+                    # self.viewEdges.add(((self.posX,self.posY+i),(self.posX,self.posY)))
+                    self.viewVertices.add((self.posX,self.posY+i))
+                    self.viewVertices_prime.add((self.posX,self.posY+i))
+                    if (self.posX,self.posY+i) in taskVertices:
+                        self.viewTasks.add((self.posX,self.posY+i))
+                        self.viewTasks_prime.add((self.posX,self.posY+i))
+                    for j in  range(1,k-i+1):
+                        if (self.posX+j,self.posY+i) in vertices:
+                            #self.viewEdges.add(((self.posX+j-1,self.posY+i),(self.posX+j,self.posY+i)))
+                            #self.viewEdges.add(((self.posX+j,self.posY+i),(self.posX+j-1,self.posY+i)))
+                            self.viewVertices.add((self.posX+j,self.posY+i))
+                            self.viewVertices_prime.add((self.posX+j,self.posY+i))
+                            if (self.posX+j,self.posY+i) in taskVertices:
+                                self.viewTasks.add((self.posX+j,self.posY+i))
+                                self.viewTasks_prime.add((self.posX+j,self.posY+i))
+                        if (self.posX-j,self.posY+i) in vertices:
+                            #self.viewEdges.add(((self.posX-j+1,self.posY+i),(self.posX-j,self.posY+i)))
+                            #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY+i)))
+                            self.viewVertices.add((self.posX-j,self.posY+i))
+                            self.viewVertices_prime.add((self.posX-j,self.posY+i))
+                            if (self.posX-j,self.posY+i) in taskVertices:
+                                self.viewTasks.add((self.posX-j,self.posY+i))
+                                self.viewTasks_prime.add((self.posX-j,self.posY+i))
 
-            if (self.posX,self.posY-i) in vertices:
-                #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY-i)))
-                #self.viewEdges.add(((self.posX,self.posY-i),(self.posX,self.posY)))
-                self.viewVertices.add((self.posX,self.posY-i))
-                self.viewVertices_prime.add((self.posX,self.posY-i))
-                if (self.posX,self.posY-i) in taskVertices:
-                    self.viewTasks.add((self.posX,self.posY-i))
-                    self.viewTasks_prime.add((self.posX,self.posY-i))
-                for j in  range(1,k-i+1):
-                    if (self.posX+j,self.posY-i) in vertices:
-                        # self.viewEdges.add(((self.posX+j-1,self.posY-i),(self.posX+j,self.posY-i)))
-                        # self.viewEdges.add(((self.posX+j,self.posY-i),(self.posX+j-1,self.posY-i)))
-                        self.viewVertices.add((self.posX+j,self.posY-i))
-                        self.viewVertices_prime.add((self.posX+j,self.posY-i))
-                        if (self.posX+j,self.posY-i) in taskVertices:
-                            self.viewTasks.add((self.posX+j,self.posY-i))
-                            self.viewTasks_prime.add((self.posX+j,self.posY-i))
-                    if (self.posX-j,self.posY-i) in vertices:
-                        #self.viewEdges.add(((self.posX-j+1,self.posY-i),(self.posX-j,self.posY-i)))
-                        #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY-i)))
-                        self.viewVertices.add((self.posX-j,self.posY-i))
-                        self.viewVertices_prime.add((self.posX-j,self.posY-i))
-                        if (self.posX-j,self.posY-i) in taskVertices:
-                            self.viewTasks.add((self.posX-j,self.posY-i))
-                            self.viewTasks_prime.add((self.posX-j,self.posY-i))
+                if (self.posX,self.posY-i) in vertices:
+                    #self.viewEdges.add(((self.posX,self.posY),(self.posX,self.posY-i)))
+                    #self.viewEdges.add(((self.posX,self.posY-i),(self.posX,self.posY)))
+                    self.viewVertices.add((self.posX,self.posY-i))
+                    self.viewVertices_prime.add((self.posX,self.posY-i))
+                    if (self.posX,self.posY-i) in taskVertices:
+                        self.viewTasks.add((self.posX,self.posY-i))
+                        self.viewTasks_prime.add((self.posX,self.posY-i))
+                    for j in  range(1,k-i+1):
+                        if (self.posX+j,self.posY-i) in vertices:
+                            # self.viewEdges.add(((self.posX+j-1,self.posY-i),(self.posX+j,self.posY-i)))
+                            # self.viewEdges.add(((self.posX+j,self.posY-i),(self.posX+j-1,self.posY-i)))
+                            self.viewVertices.add((self.posX+j,self.posY-i))
+                            self.viewVertices_prime.add((self.posX+j,self.posY-i))
+                            if (self.posX+j,self.posY-i) in taskVertices:
+                                self.viewTasks.add((self.posX+j,self.posY-i))
+                                self.viewTasks_prime.add((self.posX+j,self.posY-i))
+                        if (self.posX-j,self.posY-i) in vertices:
+                            #self.viewEdges.add(((self.posX-j+1,self.posY-i),(self.posX-j,self.posY-i)))
+                            #self.viewEdges.add(((self.posX-j,self.posY+1),(self.posX-j+1,self.posY-i)))
+                            self.viewVertices.add((self.posX-j,self.posY-i))
+                            self.viewVertices_prime.add((self.posX-j,self.posY-i))
+                            if (self.posX-j,self.posY-i) in taskVertices:
+                                self.viewTasks.add((self.posX-j,self.posY-i))
+                                self.viewTasks_prime.add((self.posX-j,self.posY-i))
 
-            for u in self.viewVertices:
-                if (u[0]+1,u[1]) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0]+1,u[1])))
-                    self.viewEdges.add(((u[0]+1,u[1]),(u[0],u[1])))
+        for u in self.viewVertices:
+            if (u[0]+1,u[1]) in self.viewVertices:
+                self.viewEdges.add(((u[0],u[1]),(u[0]+1,u[1])))
+                self.viewEdges.add(((u[0]+1,u[1]),(u[0],u[1])))
 
-                if (u[0]-1,u[1]) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0]-1,u[1])))
-                    self.viewEdges.add(((u[0]-1,u[1]),(u[0],u[1])))
+            if (u[0]-1,u[1]) in self.viewVertices:
+                self.viewEdges.add(((u[0],u[1]),(u[0]-1,u[1])))
+                self.viewEdges.add(((u[0]-1,u[1]),(u[0],u[1])))
 
-                if (u[0],u[1]+1) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0],u[1]+1)))
-                    self.viewEdges.add(((u[0],u[1]+1),(u[0],u[1])))
+            if (u[0],u[1]+1) in self.viewVertices:
+                self.viewEdges.add(((u[0],u[1]),(u[0],u[1]+1)))
+                self.viewEdges.add(((u[0],u[1]+1),(u[0],u[1])))
 
-                if (u[0],u[1]-1) in self.viewVertices:
-                    self.viewEdges.add(((u[0],u[1]),(u[0],u[1]-1)))
-                    self.viewEdges.add(((u[0],u[1]-1),(u[0],u[1])))
+            if (u[0],u[1]-1) in self.viewVertices:
+                self.viewEdges.add(((u[0],u[1]),(u[0],u[1]-1)))
+                self.viewEdges.add(((u[0],u[1]-1),(u[0],u[1])))
 
-            for u in self.viewVertices_prime:
-                if (u[0]+1,u[1]) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0]+1,u[1])))
-                    self.viewEdges_prime.add(((u[0]+1,u[1]),(u[0],u[1])))
+        for u in self.viewVertices_prime:
+            if (u[0]+1,u[1]) in self.viewVertices_prime:
+                self.viewEdges_prime.add(((u[0],u[1]),(u[0]+1,u[1])))
+                self.viewEdges_prime.add(((u[0]+1,u[1]),(u[0],u[1])))
 
-                if (u[0]-1,u[1]) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0]-1,u[1])))
-                    self.viewEdges_prime.add(((u[0]-1,u[1]),(u[0],u[1])))
+            if (u[0]-1,u[1]) in self.viewVertices_prime:
+                self.viewEdges_prime.add(((u[0],u[1]),(u[0]-1,u[1])))
+                self.viewEdges_prime.add(((u[0]-1,u[1]),(u[0],u[1])))
 
-                if (u[0],u[1]+1) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]+1)))
-                    self.viewEdges_prime.add(((u[0],u[1]+1),(u[0],u[1])))
+            if (u[0],u[1]+1) in self.viewVertices_prime:
+                self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]+1)))
+                self.viewEdges_prime.add(((u[0],u[1]+1),(u[0],u[1])))
 
-                if (u[0],u[1]-1) in self.viewVertices_prime:
-                    self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]-1)))
-                    self.viewEdges_prime.add(((u[0],u[1]-1),(u[0],u[1])))
+            if (u[0],u[1]-1) in self.viewVertices_prime:
+                self.viewEdges_prime.add(((u[0],u[1]),(u[0],u[1]-1)))
+                self.viewEdges_prime.add(((u[0],u[1]-1),(u[0],u[1])))
 
-            s=self.viewVertices.copy()
-            E=self.viewEdges.copy()
-            T=self.viewTasks.copy()
+        s=self.viewVertices.copy()
+        E=self.viewEdges.copy()
+        T=self.viewTasks.copy()
 
-            s_prime=self.viewVertices_prime.copy()
-            E_prime=self.viewEdges_prime.copy()
-            T_prime=self.viewTasks_prime.copy()
-            ##print(E)
-            for u in s:
-                if u!=(self.posX,self.posY) and not ut.bfs(s,E,(self.posX,self.posY),u):
-                    for e in E:
-                        if (e[0]==u or e[1]==u) and e in self.viewEdges:
-                            self.viewEdges.remove(e)
-                    self.viewVertices.remove(u)
-                    if u in T:
-                        self.viewTasks.remove(u)
-            del s
+        s_prime=self.viewVertices_prime.copy()
+        E_prime=self.viewEdges_prime.copy()
+        T_prime=self.viewTasks_prime.copy()
+        ##print(E)
+        for u in s:
+            if u!=(self.posX,self.posY) and not ut.bfs(s,E,(self.posX,self.posY),u):
+                for e in E:
+                    if (e[0]==u or e[1]==u) and e in self.viewEdges:
+                        self.viewEdges.remove(e)
+                self.viewVertices.remove(u)
+                if u in T:
+                    self.viewTasks.remove(u)
+        del s
 
-            for u in s_prime:
-                if u!=(self.posX,self.posY) and not ut.bfs(s_prime,E_prime,(self.posX,self.posY),u):
-                    for e in E_prime:
-                        if (e[0]==u or e[1]==u) and e in self.viewEdges_prime:
-                            self.viewEdges_prime.remove(e)
-                    self.viewVertices_prime.remove(u)
-                    if u in T_prime:
-                        self.viewTasks_prime.remove(u)
-            del s_prime
+        for u in s_prime:
+            if u!=(self.posX,self.posY) and not ut.bfs(s_prime,E_prime,(self.posX,self.posY),u):
+                for e in E_prime:
+                    if (e[0]==u or e[1]==u) and e in self.viewEdges_prime:
+                        self.viewEdges_prime.remove(e)
+                self.viewVertices_prime.remove(u)
+                if u in T_prime:
+                    self.viewTasks_prime.remove(u)
+        del s_prime
 
     def mapOffset(self,offX,offY,mapVerts,mapEdges,mapTasks,mapAgents):
         vertices=set()
@@ -497,9 +557,11 @@ def updateAgentToAgentView():
     for a in agents:
         a.viewAgents.add(a)
         a.viewAgents_prime.add(a)
+        print(a.ID)
         for b in agents:
             if (b.posX,b.posY) in a.viewVertices:
                 a.viewAgents.add(b)
+                print("\t",b.ID)
 
             if (b.posX_prime,b.posY_prime) in a.viewVertices_prime:
                 a.viewAgents_prime.add(b)
@@ -610,7 +672,8 @@ def stateUpdate():
 
     for a in agents:
         if visualizer:
-            changeCell(a.posX, a.posY, 'blank', 0)
+            if a.getDir() != 'q':
+                changeCell(a.posX, a.posY, 'blank', 0)
 
         if a.getDir() == 'e':
             a.setXPos(a.posX+1)
@@ -1041,6 +1104,8 @@ def mergeTimelines():
         agent.color = agent.color_prime
         agent.cost = agent.cost_prime
 
+        change_gui_flag = (agent.color != agent.color_prime)
+
         agent.dir=agent.dir_prime
         agent.clusterID=(agent.clusterID_prime.copy())
         agent.parent=(agent.parent_prime)
@@ -1070,7 +1135,7 @@ def mergeTimelines():
 
         if agent.gui_split == True:
             #print(agent.ID, agent.color)
-            if visualizer:
+            if visualizer and change_gui_flag:
                 changeCell(agent.posX, agent.posY, "agent", agent.color)
             agent.gui_split = False
 
@@ -1163,7 +1228,7 @@ def main():
             explore_steps = 0
 
             rounds = 0
-            COMPLETION_PARAM = 0.1
+            COMPLETION_PARAM = 0.0
             target_completion = int(COMPLETION_PARAM * len(taskVertices))
             cluster_count = 0.0
             while len(taskVertices) > target_completion:
@@ -1173,6 +1238,7 @@ def main():
 
                 for a in agents:
                     a.updateView()
+                    print(a.ID, a.viewTasks)
 
                 updateAgentToAgentView()
                 sys.stdout.flush()
@@ -1842,7 +1908,7 @@ if visualizer:
     costLabel=Label(root,text='Total Cost: '+str(totalCost))
     costLabel.grid(row=rows+1,column=cols-3,columnspan=4)
 
-    goButton.invoke()
+    #goButton.invoke()
 
     root.mainloop()
 else:
