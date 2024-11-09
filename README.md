@@ -1,5 +1,5 @@
 # Distributed-Multi-Agent-Rollout
-Implementation of the improved DRL algorithm with provable sequential improvement wrt Greedy. 
+Implementation of the DRL algorithm with provable sequential improvement wrt Greedy as described in [this paper](https://arxiv.org/pdf/2305.15596) (appeared in AAMAS 2024). 
 
 ## Getting Started
 Make sure `python>=3.9.12` has been installed using the instructions found [here](https://www.python.org/downloads/release/python-3100/)
